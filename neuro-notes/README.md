@@ -33,3 +33,84 @@ http://localhost:5173
 - 解析 `[[双链]]` 自动生成边
 - 用 IndexedDB 保存本地笔记
 - 再加入 AI / embedding 做语义相似度关联
+# NeuroNotes
+
+NeuroNotes is a mobile-first knowledge graph note-taking app.
+
+It turns notes, concepts, and tags into an interactive graph. Users can zoom, pan, and tap any node to view related content.
+
+## Preview
+
+NeuroNotes is currently an early frontend prototype.
+
+Current prototype features:
+
+- Interactive knowledge graph
+- Mobile and tablet friendly layout
+- Zoom and pan canvas
+- Tap nodes to open note content
+- Tag filtering
+- Auto-connected concept relationships
+- Dark futuristic UI
+
+## Tech Stack
+
+- React
+- Vite
+- TypeScript
+- CSS
+
+## Getting Started
+
+Clone the project:
+
+```bash
+git clone https://github.com/Lanceashire/neuro-notes.git
+cd neuro-notes
+```
+
+Install dependencies:
+
+```bash
+npm install
+```
+
+Run the development server:
+
+```bash
+npm run dev
+```
+
+Then open the local address shown in the terminal.
+
+## Project Vision
+
+NeuroNotes aims to become a visual note-taking tool where related knowledge points are automatically connected.
+
+Instead of only writing notes in a list, users can explore their knowledge as a graph:
+
+- Notes become nodes
+- Related concepts become edges
+- Tags become clusters
+- Users can zoom, pan, and open each note from the graph
+
+## Roadmap
+
+- [x] Create frontend prototype
+- [x] Display knowledge graph nodes
+- [x] Add zoom and pan interaction
+- [x] Open note content by clicking nodes
+- [x] Add tag filtering
+- [ ] Create new notes
+- [ ] Edit notes
+- [ ] Delete notes
+- [ ] Save notes locally
+- [ ] Support `[[double links]]`
+- [ ] Generate graph from real notes
+- [ ] Export notes as Markdown
+- [ ] Add PWA support
+- [ ] Add AI-powered semantic linking
+
+## License
+
+This project is currently under active development.
