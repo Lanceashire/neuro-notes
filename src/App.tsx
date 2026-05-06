@@ -123,6 +123,13 @@ const edges: Edge[] = [
 
 const tags = ['全部', 'AI', '训练', '优化', '模型结构', '超参数', '函数', '语义关联'];
 
+const noteTypeLabels: Record<NoteType, string> = {
+  core: '核心概念',
+  method: '方法',
+  concept: '概念',
+  detail: '细节',
+};
+
 function App() {
   const [selectedNoteId, setSelectedNoteId] = useState('nn');
   const [selectedTag, setSelectedTag] = useState('全部');
@@ -132,6 +139,7 @@ function App() {
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
 
   const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
+  const selectedRelationCount = selectedNote?.links.length ?? 0;
   const noteMap = useMemo(() => Object.fromEntries(notes.map((note) => [note.id, note])), []);
 
   const visibleIds = useMemo(() => {
@@ -234,6 +242,11 @@ function App() {
             <input placeholder="搜索知识点，比如：反向传播" />
           </label>
 
+          <div className="graph-summary">
+            <span>{notes.length} 个知识点</span>
+            <span>{edges.length} 条关联</span>
+          </div>
+
           <div className="zoom-tools">
             <span className="zoom-label">{Math.round(zoom * 100)}%</span>
             <button onClick={zoomOut} className="round-button">−</button>
@@ -329,6 +342,21 @@ function App() {
               {selectedNote.tags.map((tag) => (
                 <span key={tag}>#{tag}</span>
               ))}
+            </div>
+
+            <div className="note-stats">
+              <span>
+                <b>{noteTypeLabels[selectedNote.type]}</b>
+                <small>类型</small>
+              </span>
+              <span>
+                <b>{selectedRelationCount}</b>
+                <small>自动关联</small>
+              </span>
+              <span>
+                <b>{selectedNote.tags.length}</b>
+                <small>标签</small>
+              </span>
             </div>
 
             <p className="note-content">{selectedNote.content}</p>
