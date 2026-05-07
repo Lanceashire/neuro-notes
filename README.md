@@ -16,9 +16,19 @@
 - 比obsidian更加轻便好用的
 ## 本地运行
 
+
+##
+- 本次更新：实现了一定的前后端关联功能
+- 可以正常的增删改查文件
+##
+##
+以下为工作方式
+##
 ```bash
 npm install
 npm run dev
+npm run api
+
 ```
 
 然后打开终端里显示的本地地址，比如：
@@ -28,12 +38,7 @@ http://localhost:5173
 ```
 
 ## 下一步建议
-
-- 把假数据换成真实笔记数据
-- 增加 Markdown 编辑器
-- 解析 `[[双链]]` 自动生成边
-- 用 IndexedDB 保存本地笔记
-- 再加入 AI / embedding 做语义相似度关联
+说实话我还没想好
 # NeuroNotes
 
 NeuroNotes is a mobile-first knowledge graph note-taking app.
