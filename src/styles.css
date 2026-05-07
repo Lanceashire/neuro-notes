@@ -258,6 +258,17 @@ input:focus-visible {
   line-height: 1.7;
 }
 
+.ai-card .api-status {
+  display: inline-flex;
+  margin-top: 12px;
+  padding: 6px 9px;
+  border-radius: 999px;
+  color: #0f5f5a;
+  background: rgba(15, 159, 143, 0.1);
+  border: 1px solid rgba(15, 159, 143, 0.18);
+  line-height: 1.3;
+}
+
 .workspace {
   position: relative;
   flex: 1;

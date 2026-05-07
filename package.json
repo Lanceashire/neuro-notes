@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "api": "node server/index.js",
     "dev": "vite",
+    "dev:api": "node server/index.js",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

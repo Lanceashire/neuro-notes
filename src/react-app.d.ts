@@ -31,6 +31,7 @@ declare module 'react' {
   }
 
   export function useMemo<T>(factory: () => T, dependencies: readonly unknown[]): T;
+  export function useEffect(effect: () => void | (() => void), dependencies?: readonly unknown[]): void;
   export function useRef<T>(initialValue: T): MutableRefObject<T>;
   export function useState<S>(initialState: S | (() => S)): [S, Dispatch<SetStateAction<S>>];
 

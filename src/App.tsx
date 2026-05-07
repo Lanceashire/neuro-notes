@@ -1,4 +1,4 @@
-import { PointerEvent, WheelEvent, useMemo, useRef, useState } from 'react';
+import { PointerEvent, WheelEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 type NoteType = 'core' | 'method' | 'concept' | 'detail';
 
@@ -16,7 +16,15 @@ type Note = {
 
 type Edge = [string, string, number];
 
-const notes: Note[] = [
+type GraphPayload = {
+  notes: Note[];
+  edges: Edge[];
+  tags: string[];
+};
+
+const API_BASE = 'http://127.0.0.1:8787/api';
+
+const fallbackNotes: Note[] = [
   {
     id: 'nn',
     title: '神经网络',
@@ -107,7 +115,7 @@ const notes: Note[] = [
   },
 ];
 
-const edges: Edge[] = [
+const fallbackEdges: Edge[] = [
   ['nn', 'bp', 0.95],
   ['nn', 'gd', 0.88],
   ['nn', 'act', 0.9],
@@ -121,7 +129,13 @@ const edges: Edge[] = [
   ['act', 'loss', 0.45],
 ];
 
-const tags = ['全部', 'AI', '训练', '优化', '模型结构', '超参数', '函数', '语义关联'];
+const fallbackTags = ['全部', 'AI', '训练', '优化', '模型结构', '超参数', '函数', '语义关联'];
+
+const fallbackGraph: GraphPayload = {
+  notes: fallbackNotes,
+  edges: fallbackEdges,
+  tags: fallbackTags,
+};
 
 const noteTypeLabels: Record<NoteType, string> = {
   core: '核心概念',
@@ -131,23 +145,54 @@ const noteTypeLabels: Record<NoteType, string> = {
 };
 
 function App() {
+  const [graph, setGraph] = useState<GraphPayload>(fallbackGraph);
   const [selectedNoteId, setSelectedNoteId] = useState('nn');
   const [selectedTag, setSelectedTag] = useState('全部');
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
+  const [apiMessage, setApiMessage] = useState('正在连接后端...');
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const { notes, edges, tags } = graph;
 
   const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
   const selectedRelationCount = selectedNote?.links.length ?? 0;
-  const noteMap = useMemo(() => Object.fromEntries(notes.map((note) => [note.id, note])), []);
+  const noteMap = useMemo<Record<string, Note>>(() => Object.fromEntries(notes.map((note) => [note.id, note])), [notes]);
 
   const visibleIds = useMemo(() => {
     if (selectedTag === '全部') return new Set(notes.map((note) => note.id));
     return new Set(notes.filter((note) => note.tags.includes(selectedTag)).map((note) => note.id));
-  }, [selectedTag]);
+  }, [notes, selectedTag]);
 
   const visibleEdges = edges.filter(([a, b]) => visibleIds.has(a) && visibleIds.has(b));
+
+  useEffect(() => {
+    let ignored = false;
+
+    async function loadGraph() {
+      try {
+        const response = await fetch(`${API_BASE}/graph`);
+        if (!response.ok) throw new Error(`后端返回 ${response.status}`);
+        const data = (await response.json()) as GraphPayload;
+        if (ignored) return;
+
+        setGraph(data);
+        setSelectedNoteId((current) => (data.notes.some((note) => note.id === current) ? current : data.notes[0]?.id ?? ''));
+        setSelectedTag((current) => (data.tags.includes(current) ? current : '全部'));
+        setApiMessage('后端已连接');
+      } catch {
+        if (!ignored) {
+          setApiMessage('后端未启动，正在使用本地示例数据');
+        }
+      }
+    }
+
+    loadGraph();
+
+    return () => {
+      ignored = true;
+    };
+  }, []);
 
   function zoomIn() {
     setZoom((value) => Math.min(1.6, Number((value + 0.12).toFixed(2))));
@@ -189,6 +234,32 @@ function App() {
     });
   }
 
+  async function createNote() {
+    const title = window.prompt('新知识点标题');
+    if (!title?.trim()) return;
+
+    try {
+      const response = await fetch(`${API_BASE}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title,
+          type: 'concept',
+          tags: ['临时想法'],
+        }),
+      });
+      const data = (await response.json()) as { note?: Note; graph?: GraphPayload; error?: string };
+      if (!response.ok || !data.note || !data.graph) throw new Error(data.error ?? '保存失败');
+
+      setGraph(data.graph);
+      setSelectedNoteId(data.note.id);
+      setSelectedTag('全部');
+      setApiMessage('已保存到后端');
+    } catch (error) {
+      setApiMessage(error instanceof Error ? error.message : '保存失败，请确认后端已启动');
+    }
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -200,7 +271,7 @@ function App() {
           </div>
         </div>
 
-        <button className="primary-button">＋ 新建知识点</button>
+        <button className="primary-button" onClick={createNote}>＋ 新建知识点</button>
 
         <label className="search-box">
           <span>⌕</span>
@@ -224,6 +295,7 @@ function App() {
         <div className="ai-card">
           <strong>✨ 自动关联</strong>
           <p>第一版可以用 [[双链]]、标签和关键词匹配生成连线，后续再加入 embedding 做语义关联。</p>
+          <p className="api-status">{apiMessage}</p>
         </div>
       </aside>
 
