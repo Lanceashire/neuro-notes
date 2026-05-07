@@ -17,24 +17,50 @@ async function writeGraph(graph) {
 
 function withTags(graph) {
   const tagSet = new Set();
-  for (const note of graph.notes) {
+  const notes = graph.notes.map((note) => ({
+    ...note,
+    body: note.body ?? createDefaultBody(note),
+  }));
+
+  for (const note of notes) {
     for (const tag of note.tags ?? []) {
       tagSet.add(tag);
     }
   }
 
   return {
-    notes: graph.notes,
+    notes,
     edges: graph.edges,
     tags: ['全部', ...tagSet],
   };
+}
+
+function createDefaultBody(note) {
+  return [
+    `# ${note.title}`,
+    '',
+    note.content,
+    '',
+    '## 代码片段',
+    '',
+    '```ts',
+    `const topic = "${note.title}";`,
+    'console.log(topic);',
+    '```',
+    '',
+    '## 公式',
+    '',
+    '$$',
+    'L = \\frac{1}{n}\\sum_{i=1}^{n}(y_i - \\hat{y}_i)^2',
+    '$$',
+  ].join('\n');
 }
 
 function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
     'Content-Type': 'application/json; charset=utf-8',
   });
   response.end(JSON.stringify(payload));
@@ -44,7 +70,7 @@ function sendEmpty(response, statusCode = 204) {
   response.writeHead(statusCode, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
   });
   response.end();
 }
@@ -94,6 +120,7 @@ function createNote(payload, graph) {
     y: Math.round((48 + Math.sin(angle) * 25) * 10) / 10,
     size: type === 'detail' ? 58 : 68,
     content,
+    body: String(payload.body ?? createDefaultBody({ title, content })).trim(),
     links: payload.links && Array.isArray(payload.links) ? payload.links.map(String).slice(0, 8) : ['神经网络'],
   };
 
@@ -102,6 +129,26 @@ function createNote(payload, graph) {
   const core = graph.notes.find((item) => item.id === 'nn');
   if (core && core.id !== note.id) {
     graph.edges.push([core.id, note.id, 0.52]);
+  }
+
+  return note;
+}
+
+function updateNote(noteId, payload, graph) {
+  const note = graph.notes.find((item) => item.id === noteId);
+  if (!note) return null;
+
+  if (Object.hasOwn(payload, 'body')) {
+    note.body = String(payload.body ?? '').slice(0, 200000);
+  }
+
+  if (Object.hasOwn(payload, 'content')) {
+    note.content = String(payload.content ?? '').slice(0, 2000);
+  }
+
+  if (Array.isArray(payload.tags)) {
+    const tags = payload.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 8);
+    note.tags = tags.length > 0 ? tags : note.tags;
   }
 
   return note;
@@ -139,6 +186,20 @@ const server = createServer(async (request, response) => {
       const note = createNote(await readBody(request), graph);
       await writeGraph(graph);
       sendJson(response, 201, { note, graph: withTags(graph) });
+      return;
+    }
+
+    if (request.method === 'PATCH' && url.pathname.startsWith('/api/notes/')) {
+      const graph = await readGraph();
+      const noteId = decodeURIComponent(url.pathname.replace('/api/notes/', ''));
+      const note = updateNote(noteId, await readBody(request), graph);
+      if (!note) {
+        sendJson(response, 404, { error: '知识点不存在' });
+        return;
+      }
+
+      await writeGraph(graph);
+      sendJson(response, 200, { note, graph: withTags(graph) });
       return;
     }
 

@@ -11,6 +11,7 @@ type Note = {
   y: number;
   size: number;
   content: string;
+  body?: string;
   links: string[];
 };
 
@@ -21,6 +22,8 @@ type GraphPayload = {
   edges: Edge[];
   tags: string[];
 };
+
+type EditorMode = 'edit' | 'preview';
 
 const API_BASE = 'http://127.0.0.1:8787/api';
 
@@ -144,6 +147,150 @@ const noteTypeLabels: Record<NoteType, string> = {
   detail: '细节',
 };
 
+function createMarkdownTemplate(note: Note) {
+  return [
+    `# ${note.title}`,
+    '',
+    note.content,
+    '',
+    '## 代码片段',
+    '',
+    '```ts',
+    `const topic = "${note.title}";`,
+    'console.log(topic);',
+    '```',
+    '',
+    '## 公式',
+    '',
+    '$$',
+    'L = \\frac{1}{n}\\sum_{i=1}^{n}(y_i - \\hat{y}_i)^2',
+    '$$',
+  ].join('\n');
+}
+
+function getNoteBody(note: Note) {
+  return note.body?.trim() ? note.body : createMarkdownTemplate(note);
+}
+
+function isSpecialMarkdownLine(line: string) {
+  const trimmed = line.trim();
+  return (
+    trimmed.startsWith('#') ||
+    trimmed.startsWith('```') ||
+    trimmed === '$$' ||
+    trimmed.startsWith('- ') ||
+    trimmed.startsWith('> ')
+  );
+}
+
+function renderInlineMarkdown(text: string, blockKey: string) {
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\$[^$\n]+\$)/g);
+
+  return parts.map((part, index) => {
+    const key = `${blockKey}-${index}`;
+    if (!part) return null;
+    if (part.startsWith('`') && part.endsWith('`')) return <code key={key}>{part.slice(1, -1)}</code>;
+    if (part.startsWith('**') && part.endsWith('**')) return <strong key={key}>{part.slice(2, -2)}</strong>;
+    if (part.startsWith('*') && part.endsWith('*')) return <em key={key}>{part.slice(1, -1)}</em>;
+    if (part.startsWith('$') && part.endsWith('$')) return <span className="math-inline" key={key}>{part.slice(1, -1)}</span>;
+    return part;
+  });
+}
+
+function renderMarkdown(markdown: string) {
+  const lines = markdown.replace(/\r\n/g, '\n').split('\n');
+  const blocks: JSX.Element[] = [];
+  let index = 0;
+
+  while (index < lines.length) {
+    const line = lines[index];
+    const trimmed = line.trim();
+    const key = `md-${index}`;
+
+    if (!trimmed) {
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith('```')) {
+      const language = trimmed.slice(3).trim();
+      const codeLines: string[] = [];
+      index += 1;
+      while (index < lines.length && !lines[index].trim().startsWith('```')) {
+        codeLines.push(lines[index]);
+        index += 1;
+      }
+      index += 1;
+      blocks.push(
+        <figure className="markdown-code" key={key}>
+          {language && <figcaption>{language}</figcaption>}
+          <pre><code>{codeLines.join('\n')}</code></pre>
+        </figure>
+      );
+      continue;
+    }
+
+    if (trimmed === '$$') {
+      const formulaLines: string[] = [];
+      index += 1;
+      while (index < lines.length && lines[index].trim() !== '$$') {
+        formulaLines.push(lines[index]);
+        index += 1;
+      }
+      index += 1;
+      blocks.push(<div className="math-block" key={key}>{formulaLines.join('\n')}</div>);
+      continue;
+    }
+
+    const heading = trimmed.match(/^(#{1,3})\s+(.+)$/);
+    if (heading) {
+      const level = heading[1].length;
+      const content = renderInlineMarkdown(heading[2], key);
+      if (level === 1) blocks.push(<h1 key={key}>{content}</h1>);
+      if (level === 2) blocks.push(<h2 key={key}>{content}</h2>);
+      if (level === 3) blocks.push(<h3 key={key}>{content}</h3>);
+      index += 1;
+      continue;
+    }
+
+    if (trimmed.startsWith('- ')) {
+      const items: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith('- ')) {
+        items.push(lines[index].trim().slice(2));
+        index += 1;
+      }
+      blocks.push(
+        <ul key={key}>
+          {items.map((item, itemIndex) => (
+            <li key={`${key}-${itemIndex}`}>{renderInlineMarkdown(item, `${key}-${itemIndex}`)}</li>
+          ))}
+        </ul>
+      );
+      continue;
+    }
+
+    if (trimmed.startsWith('> ')) {
+      const quoteLines: string[] = [];
+      while (index < lines.length && lines[index].trim().startsWith('> ')) {
+        quoteLines.push(lines[index].trim().slice(2));
+        index += 1;
+      }
+      blocks.push(<blockquote key={key}>{renderInlineMarkdown(quoteLines.join(' '), key)}</blockquote>);
+      continue;
+    }
+
+    const paragraphLines = [trimmed];
+    index += 1;
+    while (index < lines.length && lines[index].trim() && !isSpecialMarkdownLine(lines[index])) {
+      paragraphLines.push(lines[index].trim());
+      index += 1;
+    }
+    blocks.push(<p key={key}>{renderInlineMarkdown(paragraphLines.join(' '), key)}</p>);
+  }
+
+  return blocks.length > 0 ? blocks : [<p key="empty">开始写这个知识点的详细笔记吧。</p>];
+}
+
 function App() {
   const [graph, setGraph] = useState<GraphPayload>(fallbackGraph);
   const [selectedNoteId, setSelectedNoteId] = useState('nn');
@@ -152,11 +299,15 @@ function App() {
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
   const [apiMessage, setApiMessage] = useState('正在连接后端...');
+  const [editorMode, setEditorMode] = useState<EditorMode>('edit');
+  const [noteDraft, setNoteDraft] = useState('');
+  const [saveMessage, setSaveMessage] = useState('支持 Markdown、代码块和 LaTeX');
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const { notes, edges, tags } = graph;
 
   const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
   const selectedRelationCount = selectedNote?.links.length ?? 0;
+  const renderedNote = useMemo(() => renderMarkdown(noteDraft), [noteDraft]);
   const noteMap = useMemo<Record<string, Note>>(() => Object.fromEntries(notes.map((note) => [note.id, note])), [notes]);
 
   const visibleIds = useMemo(() => {
@@ -193,6 +344,12 @@ function App() {
       ignored = true;
     };
   }, []);
+
+  useEffect(() => {
+    if (!selectedNote) return;
+    setNoteDraft(getNoteBody(selectedNote));
+    setSaveMessage('支持 Markdown、代码块和 LaTeX');
+  }, [selectedNote?.id, selectedNote?.body, selectedNote?.content]);
 
   function zoomIn() {
     setZoom((value) => Math.min(1.6, Number((value + 0.12).toFixed(2))));
@@ -254,9 +411,39 @@ function App() {
       setGraph(data.graph);
       setSelectedNoteId(data.note.id);
       setSelectedTag('全部');
+      setEditorMode('edit');
       setApiMessage('已保存到后端');
     } catch (error) {
       setApiMessage(error instanceof Error ? error.message : '保存失败，请确认后端已启动');
+    }
+  }
+
+  function patchNoteLocally(noteId: string, patch: Partial<Note>) {
+    setGraph((current) => ({
+      ...current,
+      notes: current.notes.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
+    }));
+  }
+
+  async function saveNoteBody() {
+    if (!selectedNote) return;
+
+    try {
+      setSaveMessage('正在保存...');
+      const response = await fetch(`${API_BASE}/notes/${encodeURIComponent(selectedNote.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ body: noteDraft }),
+      });
+      const data = (await response.json()) as { note?: Note; graph?: GraphPayload; error?: string };
+      if (!response.ok || !data.note || !data.graph) throw new Error(data.error ?? '保存失败');
+
+      setGraph(data.graph);
+      setSelectedNoteId(data.note.id);
+      setSaveMessage('已保存到后端');
+    } catch (error) {
+      patchNoteLocally(selectedNote.id, { body: noteDraft });
+      setSaveMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
     }
   }
 
@@ -433,6 +620,48 @@ function App() {
 
             <p className="note-content">{selectedNote.content}</p>
 
+            <section className="note-editor">
+              <div className="editor-header">
+                <div>
+                  <strong>Markdown 笔记</strong>
+                  <small>{saveMessage}</small>
+                </div>
+                <div className="editor-tabs">
+                  <button
+                    className={editorMode === 'edit' ? 'active' : ''}
+                    onClick={() => setEditorMode('edit')}
+                  >
+                    编辑
+                  </button>
+                  <button
+                    className={editorMode === 'preview' ? 'active' : ''}
+                    onClick={() => setEditorMode('preview')}
+                  >
+                    预览
+                  </button>
+                </div>
+              </div>
+
+              {editorMode === 'edit' ? (
+                <textarea
+                  className="markdown-editor"
+                  value={noteDraft}
+                  spellCheck={false}
+                  onChange={(event: { target: HTMLTextAreaElement }) => {
+                    setNoteDraft(event.target.value);
+                    setSaveMessage('有未保存修改');
+                  }}
+                />
+              ) : (
+                <div className="markdown-preview">{renderedNote}</div>
+              )}
+
+              <div className="editor-actions">
+                <span>代码块用 ```，公式用 $...$ 或 $$...$$</span>
+                <button className="open-note-button" onClick={saveNoteBody}>保存笔记</button>
+              </div>
+            </section>
+
             <div className="relation-box">
               <strong>🔗 自动关联</strong>
               <div>
@@ -442,7 +671,6 @@ function App() {
               </div>
             </div>
 
-            <button className="open-note-button">打开完整笔记</button>
           </article>
         )}
       </section>
