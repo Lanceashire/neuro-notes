@@ -25,6 +25,14 @@ type GraphPayload = {
 
 type EditorMode = 'edit' | 'preview';
 
+type NoteForm = {
+  title: string;
+  type: NoteType;
+  tags: string;
+  content: string;
+  links: string;
+};
+
 const API_BASE = 'http://127.0.0.1:8787/api';
 
 const fallbackNotes: Note[] = [
@@ -146,6 +154,52 @@ const noteTypeLabels: Record<NoteType, string> = {
   concept: '概念',
   detail: '细节',
 };
+
+const noteTypeOptions: NoteType[] = ['core', 'method', 'concept', 'detail'];
+
+const emptyNoteForm: NoteForm = {
+  title: '',
+  type: 'concept',
+  tags: '临时想法',
+  content: '',
+  links: '神经网络',
+};
+
+function splitList(value: string) {
+  return value
+    .split(/[,，\n]/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function joinList(value: string[]) {
+  return value.join('，');
+}
+
+function tagsFromNotes(notes: Note[]) {
+  const tagSet = new Set<string>();
+  for (const note of notes) {
+    for (const tag of note.tags) tagSet.add(tag);
+  }
+  return ['全部', ...tagSet];
+}
+
+function graphWithTags(graph: GraphPayload): GraphPayload {
+  return {
+    ...graph,
+    tags: tagsFromNotes(graph.notes),
+  };
+}
+
+function noteToForm(note: Note): NoteForm {
+  return {
+    title: note.title,
+    type: note.type,
+    tags: joinList(note.tags),
+    content: note.content,
+    links: joinList(note.links),
+  };
+}
 
 function createMarkdownTemplate(note: Note) {
   return [
@@ -302,6 +356,10 @@ function App() {
   const [editorMode, setEditorMode] = useState<EditorMode>('edit');
   const [noteDraft, setNoteDraft] = useState('');
   const [saveMessage, setSaveMessage] = useState('支持 Markdown、代码块和 LaTeX');
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
+  const [createDraft, setCreateDraft] = useState<NoteForm>(emptyNoteForm);
+  const [detailsDraft, setDetailsDraft] = useState<NoteForm>(emptyNoteForm);
+  const [detailsMessage, setDetailsMessage] = useState('基础信息可编辑');
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const { notes, edges, tags } = graph;
 
@@ -348,8 +406,10 @@ function App() {
   useEffect(() => {
     if (!selectedNote) return;
     setNoteDraft(getNoteBody(selectedNote));
+    setDetailsDraft(noteToForm(selectedNote));
     setSaveMessage('支持 Markdown、代码块和 LaTeX');
-  }, [selectedNote?.id, selectedNote?.body, selectedNote?.content]);
+    setDetailsMessage('基础信息可编辑');
+  }, [selectedNote?.id, selectedNote?.title, selectedNote?.body, selectedNote?.content]);
 
   function zoomIn() {
     setZoom((value) => Math.min(1.6, Number((value + 0.12).toFixed(2))));
@@ -391,18 +451,47 @@ function App() {
     });
   }
 
+  function makeLocalNote(payload: NoteForm): Note {
+    const index = notes.length;
+    const angle = (index / Math.max(notes.length, 1)) * Math.PI * 2;
+    const title = payload.title.trim();
+    const content = payload.content.trim() || '新的知识点，可以继续补充摘要和 Markdown 笔记。';
+    const localNote: Note = {
+      id: `local-${Date.now().toString(36)}`,
+      title,
+      type: payload.type,
+      tags: splitList(payload.tags).slice(0, 8),
+      x: Math.round((50 + Math.cos(angle) * 30) * 10) / 10,
+      y: Math.round((48 + Math.sin(angle) * 25) * 10) / 10,
+      size: payload.type === 'detail' ? 58 : 68,
+      content,
+      body: createMarkdownTemplate({ ...fallbackNotes[0], title, content }),
+      links: splitList(payload.links).slice(0, 12),
+    };
+
+    return {
+      ...localNote,
+      tags: localNote.tags.length > 0 ? localNote.tags : ['临时想法'],
+      links: localNote.links.length > 0 ? localNote.links : ['神经网络'],
+    };
+  }
+
   async function createNote() {
-    const title = window.prompt('新知识点标题');
-    if (!title?.trim()) return;
+    if (!createDraft.title.trim()) {
+      setApiMessage('请先填写知识点标题');
+      return;
+    }
 
     try {
       const response = await fetch(`${API_BASE}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title,
-          type: 'concept',
-          tags: ['临时想法'],
+          title: createDraft.title,
+          type: createDraft.type,
+          tags: splitList(createDraft.tags),
+          content: createDraft.content,
+          links: splitList(createDraft.links),
         }),
       });
       const data = (await response.json()) as { note?: Note; graph?: GraphPayload; error?: string };
@@ -413,16 +502,69 @@ function App() {
       setSelectedTag('全部');
       setEditorMode('edit');
       setApiMessage('已保存到后端');
+      setCreateDraft(emptyNoteForm);
+      setIsCreateOpen(false);
     } catch (error) {
-      setApiMessage(error instanceof Error ? error.message : '保存失败，请确认后端已启动');
+      const note = makeLocalNote(createDraft);
+      setGraph((current) => graphWithTags({
+        ...current,
+        notes: [...current.notes, note],
+      }));
+      setSelectedNoteId(note.id);
+      setSelectedTag('全部');
+      setEditorMode('edit');
+      setCreateDraft(emptyNoteForm);
+      setIsCreateOpen(false);
+      setApiMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
     }
   }
 
   function patchNoteLocally(noteId: string, patch: Partial<Note>) {
-    setGraph((current) => ({
+    setGraph((current) => graphWithTags({
       ...current,
       notes: current.notes.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
     }));
+  }
+
+  function patchGraphNote(noteId: string, patch: Partial<Note>) {
+    setGraph((current) => graphWithTags({
+      ...current,
+      notes: current.notes.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
+    }));
+  }
+
+  async function saveNoteDetails() {
+    if (!selectedNote) return;
+    if (!detailsDraft.title.trim()) {
+      setDetailsMessage('标题不能为空');
+      return;
+    }
+
+    const patch: Partial<Note> = {
+      title: detailsDraft.title.trim(),
+      type: detailsDraft.type,
+      tags: splitList(detailsDraft.tags).slice(0, 8),
+      content: detailsDraft.content.trim() || '这个知识点还没有摘要。',
+      links: splitList(detailsDraft.links).slice(0, 12),
+    };
+
+    try {
+      setDetailsMessage('正在保存...');
+      const response = await fetch(`${API_BASE}/notes/${encodeURIComponent(selectedNote.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const data = (await response.json()) as { note?: Note; graph?: GraphPayload; error?: string };
+      if (!response.ok || !data.note || !data.graph) throw new Error(data.error ?? '保存失败');
+
+      setGraph(data.graph);
+      setSelectedNoteId(data.note.id);
+      setDetailsMessage('已保存到后端');
+    } catch (error) {
+      patchGraphNote(selectedNote.id, patch);
+      setDetailsMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
+    }
   }
 
   async function saveNoteBody() {
@@ -447,6 +589,51 @@ function App() {
     }
   }
 
+  async function deleteSelectedNote() {
+    if (!selectedNote) return;
+    const ok = window.confirm(`确认删除「${selectedNote.title}」吗？这个操作会移除相关连线。`);
+    if (!ok) return;
+
+    const fallbackSelection = notes.find((note) => note.id !== selectedNote.id)?.id ?? '';
+
+    try {
+      const response = await fetch(`${API_BASE}/notes/${encodeURIComponent(selectedNote.id)}`, {
+        method: 'DELETE',
+      });
+      const data = (await response.json()) as { graph?: GraphPayload; error?: string };
+      if (!response.ok || !data.graph) throw new Error(data.error ?? '删除失败');
+
+      setGraph(data.graph);
+      setSelectedNoteId(data.graph.notes[0]?.id ?? '');
+      setSelectedTag('全部');
+      setApiMessage('已从后端删除');
+    } catch (error) {
+      setGraph((current) => graphWithTags({
+        notes: current.notes.filter((note) => note.id !== selectedNote.id),
+        edges: current.edges.filter(([source, target]) => source !== selectedNote.id && target !== selectedNote.id),
+        tags: current.tags,
+      }));
+      setSelectedNoteId(fallbackSelection);
+      setSelectedTag('全部');
+      setApiMessage(error instanceof Error ? `${error.message}，已从当前页面移除` : '已从当前页面移除');
+    }
+  }
+
+  function updateCreateDraft(field: keyof NoteForm, value: string) {
+    setCreateDraft((current) => ({
+      ...current,
+      [field]: field === 'type' ? value as NoteType : value,
+    }));
+  }
+
+  function updateDetailsDraft(field: keyof NoteForm, value: string) {
+    setDetailsDraft((current) => ({
+      ...current,
+      [field]: field === 'type' ? value as NoteType : value,
+    }));
+    setDetailsMessage('有未保存修改');
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -458,7 +645,7 @@ function App() {
           </div>
         </div>
 
-        <button className="primary-button" onClick={createNote}>＋ 新建知识点</button>
+        <button className="primary-button" onClick={() => setIsCreateOpen(true)}>＋ 新建知识点</button>
 
         <label className="search-box">
           <span>⌕</span>
@@ -618,6 +805,63 @@ function App() {
               </span>
             </div>
 
+            <section className="details-editor">
+              <div className="editor-header">
+                <div>
+                  <strong>基础信息</strong>
+                  <small>{detailsMessage}</small>
+                </div>
+                <button className="danger-button" onClick={deleteSelectedNote}>删除</button>
+              </div>
+
+              <div className="form-grid">
+                <label>
+                  <span>标题</span>
+                  <input
+                    value={detailsDraft.title}
+                    onChange={(event: { target: HTMLInputElement }) => updateDetailsDraft('title', event.target.value)}
+                  />
+                </label>
+                <label>
+                  <span>类型</span>
+                  <select
+                    value={detailsDraft.type}
+                    onChange={(event: { target: HTMLSelectElement }) => updateDetailsDraft('type', event.target.value)}
+                  >
+                    {noteTypeOptions.map((type) => (
+                      <option key={type} value={type}>{noteTypeLabels[type]}</option>
+                    ))}
+                  </select>
+                </label>
+                <label className="wide-field">
+                  <span>标签</span>
+                  <input
+                    value={detailsDraft.tags}
+                    onChange={(event: { target: HTMLInputElement }) => updateDetailsDraft('tags', event.target.value)}
+                  />
+                </label>
+                <label className="wide-field">
+                  <span>摘要</span>
+                  <textarea
+                    value={detailsDraft.content}
+                    onChange={(event: { target: HTMLTextAreaElement }) => updateDetailsDraft('content', event.target.value)}
+                  />
+                </label>
+                <label className="wide-field">
+                  <span>关联</span>
+                  <input
+                    value={detailsDraft.links}
+                    onChange={(event: { target: HTMLInputElement }) => updateDetailsDraft('links', event.target.value)}
+                  />
+                </label>
+              </div>
+
+              <div className="editor-actions compact-actions">
+                <span>标签和关联可以用中文逗号或英文逗号分隔</span>
+                <button className="open-note-button" onClick={saveNoteDetails}>保存信息</button>
+              </div>
+            </section>
+
             <p className="note-content">{selectedNote.content}</p>
 
             <section className="note-editor">
@@ -674,6 +918,80 @@ function App() {
           </article>
         )}
       </section>
+
+      {isCreateOpen && (
+        <div className="modal-backdrop">
+          <section className="create-modal">
+            <div className="panel-header">
+              <div>
+                <p>创建知识点</p>
+                <h2>新的笔记节点</h2>
+              </div>
+              <button
+                className="round-button"
+                onClick={() => {
+                  setIsCreateOpen(false);
+                  setCreateDraft(emptyNoteForm);
+                }}
+              >
+                ×
+              </button>
+            </div>
+
+            <div className="form-grid">
+              <label className="wide-field">
+                <span>标题</span>
+                <input
+                  autoFocus
+                  value={createDraft.title}
+                  placeholder="比如：Transformer"
+                  onChange={(event: { target: HTMLInputElement }) => updateCreateDraft('title', event.target.value)}
+                />
+              </label>
+              <label>
+                <span>类型</span>
+                <select
+                  value={createDraft.type}
+                  onChange={(event: { target: HTMLSelectElement }) => updateCreateDraft('type', event.target.value)}
+                >
+                  {noteTypeOptions.map((type) => (
+                    <option key={type} value={type}>{noteTypeLabels[type]}</option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                <span>标签</span>
+                <input
+                  value={createDraft.tags}
+                  placeholder="AI，模型结构"
+                  onChange={(event: { target: HTMLInputElement }) => updateCreateDraft('tags', event.target.value)}
+                />
+              </label>
+              <label className="wide-field">
+                <span>摘要</span>
+                <textarea
+                  value={createDraft.content}
+                  placeholder="先写一句话描述这个知识点"
+                  onChange={(event: { target: HTMLTextAreaElement }) => updateCreateDraft('content', event.target.value)}
+                />
+              </label>
+              <label className="wide-field">
+                <span>关联</span>
+                <input
+                  value={createDraft.links}
+                  placeholder="神经网络，Embedding"
+                  onChange={(event: { target: HTMLInputElement }) => updateCreateDraft('links', event.target.value)}
+                />
+              </label>
+            </div>
+
+            <div className="editor-actions modal-actions">
+              <span>创建后可以继续写 Markdown 正文和公式</span>
+              <button className="open-note-button" onClick={createNote}>创建知识点</button>
+            </div>
+          </section>
+        </div>
+      )}
     </main>
   );
 }

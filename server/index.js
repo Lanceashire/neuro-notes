@@ -60,7 +60,7 @@ function sendJson(response, statusCode, payload) {
   response.writeHead(statusCode, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
     'Content-Type': 'application/json; charset=utf-8',
   });
   response.end(JSON.stringify(payload));
@@ -70,7 +70,7 @@ function sendEmpty(response, statusCode = 204) {
   response.writeHead(statusCode, {
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Headers': 'Content-Type',
-    'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
+    'Access-Control-Allow-Methods': 'GET,POST,PATCH,DELETE,OPTIONS',
   });
   response.end();
 }
@@ -118,18 +118,14 @@ function createNote(payload, graph) {
     tags: safeTags,
     x: Math.round((50 + Math.cos(angle) * 30) * 10) / 10,
     y: Math.round((48 + Math.sin(angle) * 25) * 10) / 10,
-    size: type === 'detail' ? 58 : 68,
+    size: Number(payload.size) || (type === 'detail' ? 58 : 68),
     content,
     body: String(payload.body ?? createDefaultBody({ title, content })).trim(),
-    links: payload.links && Array.isArray(payload.links) ? payload.links.map(String).slice(0, 8) : ['神经网络'],
+    links: Array.isArray(payload.links) ? payload.links.map(String).map((link) => link.trim()).filter(Boolean).slice(0, 8) : ['神经网络'],
   };
 
   graph.notes.push(note);
-
-  const core = graph.notes.find((item) => item.id === 'nn');
-  if (core && core.id !== note.id) {
-    graph.edges.push([core.id, note.id, 0.52]);
-  }
+  syncEdgesForNote(note, graph);
 
   return note;
 }
@@ -137,6 +133,17 @@ function createNote(payload, graph) {
 function updateNote(noteId, payload, graph) {
   const note = graph.notes.find((item) => item.id === noteId);
   if (!note) return null;
+
+  if (Object.hasOwn(payload, 'title')) {
+    const title = String(payload.title ?? '').trim();
+    if (!title) throw new Error('标题不能为空');
+    note.title = title.slice(0, 80);
+  }
+
+  if (Object.hasOwn(payload, 'type') && VALID_TYPES.has(payload.type)) {
+    note.type = payload.type;
+    note.size = payload.type === 'detail' ? Math.min(note.size, 64) : Math.max(note.size, 68);
+  }
 
   if (Object.hasOwn(payload, 'body')) {
     note.body = String(payload.body ?? '').slice(0, 200000);
@@ -149,6 +156,35 @@ function updateNote(noteId, payload, graph) {
   if (Array.isArray(payload.tags)) {
     const tags = payload.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 8);
     note.tags = tags.length > 0 ? tags : note.tags;
+  }
+
+  if (Array.isArray(payload.links)) {
+    note.links = payload.links.map((link) => String(link).trim()).filter(Boolean).slice(0, 12);
+    syncEdgesForNote(note, graph);
+  }
+
+  return note;
+}
+
+function syncEdgesForNote(note, graph) {
+  graph.edges = graph.edges.filter(([source, target]) => source !== note.id && target !== note.id);
+
+  const linkedNotes = graph.notes.filter((item) => note.links.includes(item.title) || note.links.includes(item.id));
+  for (const linkedNote of linkedNotes) {
+    if (linkedNote.id !== note.id) {
+      graph.edges.push([linkedNote.id, note.id, 0.52]);
+    }
+  }
+}
+
+function deleteNote(noteId, graph) {
+  const note = graph.notes.find((item) => item.id === noteId);
+  if (!note) return null;
+
+  graph.notes = graph.notes.filter((item) => item.id !== noteId);
+  graph.edges = graph.edges.filter(([source, target]) => source !== noteId && target !== noteId);
+  for (const item of graph.notes) {
+    item.links = (item.links ?? []).filter((link) => link !== note.id && link !== note.title);
   }
 
   return note;
@@ -200,6 +236,20 @@ const server = createServer(async (request, response) => {
 
       await writeGraph(graph);
       sendJson(response, 200, { note, graph: withTags(graph) });
+      return;
+    }
+
+    if (request.method === 'DELETE' && url.pathname.startsWith('/api/notes/')) {
+      const graph = await readGraph();
+      const noteId = decodeURIComponent(url.pathname.replace('/api/notes/', ''));
+      const note = deleteNote(noteId, graph);
+      if (!note) {
+        sendJson(response, 404, { error: '知识点不存在' });
+        return;
+      }
+
+      await writeGraph(graph);
+      sendJson(response, 200, { deletedId: noteId, graph: withTags(graph) });
       return;
     }
 
