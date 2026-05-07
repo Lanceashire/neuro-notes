@@ -17,12 +17,15 @@ async function writeGraph(graph) {
 
 function withTags(graph) {
   const tagSet = new Set();
+  const categorySet = new Set();
   const notes = graph.notes.map((note) => ({
     ...note,
+    category: note.category ?? '神经网络',
     body: note.body ?? createDefaultBody(note),
   }));
 
   for (const note of notes) {
+    categorySet.add(note.category);
     for (const tag of note.tags ?? []) {
       tagSet.add(tag);
     }
@@ -32,6 +35,7 @@ function withTags(graph) {
     notes,
     edges: graph.edges,
     tags: ['全部', ...tagSet],
+    categories: ['全部', ...categorySet],
   };
 }
 
@@ -102,6 +106,7 @@ function createNote(payload, graph) {
     ? payload.tags.map((tag) => String(tag).trim()).filter(Boolean).slice(0, 5)
     : ['临时想法'];
   const safeTags = tags.length > 0 ? tags : ['临时想法'];
+  const category = String(payload.category ?? '未分类').trim() || '未分类';
   const content = String(payload.content ?? '新的知识点已经保存到后端，可以继续补充正文和关联。').trim();
   const index = graph.notes.length;
   const idBase = title
@@ -115,13 +120,14 @@ function createNote(payload, graph) {
     id,
     title,
     type,
+    category,
     tags: safeTags,
     x: Math.round((50 + Math.cos(angle) * 30) * 10) / 10,
     y: Math.round((48 + Math.sin(angle) * 25) * 10) / 10,
     size: Number(payload.size) || (type === 'detail' ? 58 : 68),
     content,
     body: String(payload.body ?? createDefaultBody({ title, content })).trim(),
-    links: Array.isArray(payload.links) ? payload.links.map(String).map((link) => link.trim()).filter(Boolean).slice(0, 8) : ['神经网络'],
+    links: Array.isArray(payload.links) ? payload.links.map(String).map((link) => link.trim()).filter(Boolean).slice(0, 8) : [],
   };
 
   graph.notes.push(note);
@@ -143,6 +149,10 @@ function updateNote(noteId, payload, graph) {
   if (Object.hasOwn(payload, 'type') && VALID_TYPES.has(payload.type)) {
     note.type = payload.type;
     note.size = payload.type === 'detail' ? Math.min(note.size, 64) : Math.max(note.size, 68);
+  }
+
+  if (Object.hasOwn(payload, 'category')) {
+    note.category = String(payload.category ?? '').trim().slice(0, 48) || '未分类';
   }
 
   if (Object.hasOwn(payload, 'body')) {

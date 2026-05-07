@@ -6,6 +6,7 @@ type Note = {
   id: string;
   title: string;
   type: NoteType;
+  category: string;
   tags: string[];
   x: number;
   y: number;
@@ -21,6 +22,7 @@ type GraphPayload = {
   notes: Note[];
   edges: Edge[];
   tags: string[];
+  categories: string[];
 };
 
 type EditorMode = 'edit' | 'preview';
@@ -28,6 +30,7 @@ type EditorMode = 'edit' | 'preview';
 type NoteForm = {
   title: string;
   type: NoteType;
+  category: string;
   tags: string;
   content: string;
   links: string;
@@ -40,6 +43,7 @@ const fallbackNotes: Note[] = [
     id: 'nn',
     title: '神经网络',
     type: 'core',
+    category: '神经网络',
     tags: ['AI', '深度学习'],
     x: 50,
     y: 42,
@@ -51,6 +55,7 @@ const fallbackNotes: Note[] = [
     id: 'bp',
     title: '反向传播',
     type: 'method',
+    category: '神经网络',
     tags: ['训练', '算法'],
     x: 72,
     y: 30,
@@ -62,6 +67,7 @@ const fallbackNotes: Note[] = [
     id: 'gd',
     title: '梯度下降',
     type: 'method',
+    category: '神经网络',
     tags: ['优化', '训练'],
     x: 69,
     y: 65,
@@ -73,6 +79,7 @@ const fallbackNotes: Note[] = [
     id: 'act',
     title: '激活函数',
     type: 'concept',
+    category: '神经网络',
     tags: ['模型结构'],
     x: 29,
     y: 29,
@@ -84,6 +91,7 @@ const fallbackNotes: Note[] = [
     id: 'loss',
     title: '损失函数',
     type: 'concept',
+    category: '神经网络',
     tags: ['评估', '训练'],
     x: 34,
     y: 69,
@@ -95,6 +103,7 @@ const fallbackNotes: Note[] = [
     id: 'lr',
     title: '学习率',
     type: 'detail',
+    category: '神经网络',
     tags: ['超参数'],
     x: 84,
     y: 78,
@@ -106,6 +115,7 @@ const fallbackNotes: Note[] = [
     id: 'relu',
     title: 'ReLU',
     type: 'detail',
+    category: '神经网络',
     tags: ['函数'],
     x: 16,
     y: 49,
@@ -117,6 +127,7 @@ const fallbackNotes: Note[] = [
     id: 'emb',
     title: 'Embedding',
     type: 'concept',
+    category: '神经网络',
     tags: ['AI', '语义关联'],
     x: 51,
     y: 18,
@@ -141,11 +152,13 @@ const fallbackEdges: Edge[] = [
 ];
 
 const fallbackTags = ['全部', 'AI', '训练', '优化', '模型结构', '超参数', '函数', '语义关联'];
+const fallbackCategories = ['全部', '神经网络'];
 
 const fallbackGraph: GraphPayload = {
   notes: fallbackNotes,
   edges: fallbackEdges,
   tags: fallbackTags,
+  categories: fallbackCategories,
 };
 
 const noteTypeLabels: Record<NoteType, string> = {
@@ -160,9 +173,10 @@ const noteTypeOptions: NoteType[] = ['core', 'method', 'concept', 'detail'];
 const emptyNoteForm: NoteForm = {
   title: '',
   type: 'concept',
+  category: '未分类',
   tags: '临时想法',
   content: '',
-  links: '神经网络',
+  links: '',
 };
 
 function splitList(value: string) {
