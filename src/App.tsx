@@ -1335,6 +1335,54 @@ function App() {
               </div>
             </div>
 
+            {notePanelMode === 'view' ? (
+              <section className="note-reader">
+                <div className="reader-meta">
+                  <div className="reader-properties">
+                    <span><b>大类</b>{selectedNote.category}</span>
+                    <span><b>类型</b>{noteTypeLabels[selectedNote.type]}</span>
+                    <span><b>连线</b>{selectedRelationCount} 条</span>
+                  </div>
+
+                  <div className="reader-tags">
+                    {selectedNote.tags.map((tag) => (
+                      <span key={tag}>#{tag}</span>
+                    ))}
+                  </div>
+
+                  <div className="reader-relations">
+                    <div>
+                      <strong>相关知识点</strong>
+                      <button onClick={enterLinkMode}>开始连线</button>
+                    </div>
+                    <div>
+                    {selectedNote.links.length > 0
+                      ? selectedNote.links.map((link) => {
+                        const target = notes.find((note) => note.id === link || note.title === link);
+                        return (
+                          <button
+                            key={link}
+                            onClick={() => {
+                              if (target) {
+                                setSelectedNoteId(target.id);
+                                setNotePanelMode('view');
+                              }
+                            }}
+                          >
+                            {link}
+                          </button>
+                        );
+                      })
+                      : <span>还没有手动连线</span>}
+                    </div>
+                  </div>
+                </div>
+
+                {selectedNote.content && <p className="note-content reader-summary">{selectedNote.content}</p>}
+                <div className="markdown-preview reader-preview">{renderedNote}</div>
+              </section>
+            ) : (
+              <>
             <div className="tag-row">
               {selectedNote.tags.map((tag) => (
                 <span key={tag}>#{tag}</span>
@@ -1360,45 +1408,6 @@ function App() {
               </span>
             </div>
 
-            {notePanelMode === 'view' ? (
-              <>
-                <section className="note-reader">
-                  <p className="note-content">{selectedNote.content}</p>
-                  <div className="markdown-preview reader-preview">{renderedNote}</div>
-                </section>
-
-                <div className="relation-box">
-                  <div className="relation-header">
-                    <div>
-                      <strong>相关知识点</strong>
-                      <small>{selectedNote.links.length > 0 ? '点击标签可切换到对应知识点' : '还没有手动连线'}</small>
-                    </div>
-                    <button className="link-mode-button" onClick={enterLinkMode}>开始连线</button>
-                  </div>
-                  <div className="relation-list">
-                    {selectedNote.links.length > 0
-                      ? selectedNote.links.map((link) => {
-                        const target = notes.find((note) => note.id === link || note.title === link);
-                        return (
-                          <button
-                            key={link}
-                            onClick={() => {
-                              if (target) {
-                                setSelectedNoteId(target.id);
-                                setNotePanelMode('view');
-                              }
-                            }}
-                          >
-                            {link}
-                          </button>
-                        );
-                      })
-                      : <span className="empty-relations">可进入编辑或连线模式补充关联</span>}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
             <section className="details-editor">
               <div className="editor-header">
                 <div>

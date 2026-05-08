@@ -814,9 +814,9 @@ textarea:focus-visible {
 }
 
 .note-panel.reader-panel {
-  width: min(760px, calc(100vw - 32px));
-  max-height: min(78vh, 760px);
-  padding: 22px;
+  width: min(1040px, calc(100vw - 32px));
+  max-height: min(88vh, 920px);
+  padding: 28px;
 }
 
 .note-panel.editor-panel {
@@ -922,13 +922,98 @@ textarea:focus-visible {
 }
 
 .note-reader {
-  margin-top: 16px;
+  width: min(820px, 100%);
+  margin: 22px auto 0;
+}
+
+.reader-meta {
+  display: grid;
+  gap: 12px;
+  margin-bottom: 22px;
+  padding-bottom: 18px;
+  border-bottom: 1px solid rgba(215, 226, 234, 0.9);
+}
+
+.reader-properties {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.reader-properties span {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: rgba(248, 251, 255, 0.88);
+  border: 1px solid rgba(215, 226, 234, 0.76);
+  font-size: 12px;
+}
+
+.reader-properties b {
+  display: block;
+  margin-bottom: 4px;
+  color: var(--muted);
+  font-size: 11px;
+}
+
+.reader-tags,
+.reader-relations > div:last-child {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.reader-tags span,
+.reader-relations button,
+.reader-relations > div:last-child span {
+  padding: 6px 10px;
+  border-radius: 999px;
+  color: #12315f;
+  background: #eef6ff;
+  border: 1px solid rgba(37, 99, 235, 0.16);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.reader-relations {
+  display: grid;
+  gap: 10px;
+}
+
+.reader-relations > div:first-child {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.reader-relations strong {
+  color: var(--ink);
+  font-size: 13px;
+}
+
+.reader-relations > div:first-child button {
+  border-radius: 8px;
+  color: #0f5f5a;
+  background: rgba(15, 159, 143, 0.1);
+  border-color: rgba(15, 159, 143, 0.18);
+}
+
+.reader-summary {
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border-left: 3px solid rgba(37, 99, 235, 0.38);
+  border-radius: 8px;
+  background: rgba(37, 99, 235, 0.05);
 }
 
 .reader-preview {
-  min-height: 240px;
-  max-height: 42vh;
+  min-height: 460px;
+  max-height: none;
   overflow: auto;
+  padding: 22px;
+  background: rgba(255, 255, 255, 0.86);
 }
 
 .details-editor {
@@ -1428,6 +1513,10 @@ textarea:focus-visible {
 
   .note-stats {
     grid-template-columns: repeat(2, 1fr);
+  }
+
+  .reader-properties {
+    grid-template-columns: 1fr;
   }
 
   .editor-actions {
