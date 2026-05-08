@@ -415,6 +415,7 @@ function App() {
   const [detailsMessage, setDetailsMessage] = useState('基础信息可编辑');
   const [isLinking, setIsLinking] = useState(false);
   const [linkMessage, setLinkMessage] = useState('点击“开始连线”，再点选图谱节点');
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const { notes, edges, categories } = graph;
 
@@ -422,11 +423,20 @@ function App() {
   const selectedRelationCount = selectedNote?.links.length ?? 0;
   const renderedNote = useMemo(() => renderMarkdown(noteDraft), [noteDraft]);
   const noteMap = useMemo<Record<string, Note>>(() => Object.fromEntries(notes.map((note) => [note.id, note])), [notes]);
+  const categoryFolders = useMemo(() => (
+    categories
+      .filter((category) => category !== '全部')
+      .map((category) => ({
+        category,
+        notes: notes.filter((note) => note.category === category),
+      }))
+  ), [categories, notes]);
 
   const visibleIds = useMemo(() => {
+    if (isLinking) return new Set(notes.map((note) => note.id));
     if (selectedCategory === '全部') return new Set(notes.map((note) => note.id));
     return new Set(notes.filter((note) => note.category === selectedCategory).map((note) => note.id));
-  }, [notes, selectedCategory]);
+  }, [notes, selectedCategory, isLinking]);
 
   const visibleEdges = edges.filter(([a, b]) => visibleIds.has(a) && visibleIds.has(b));
 
@@ -466,7 +476,13 @@ function App() {
     setDetailsMessage('基础信息可编辑');
     setIsLinking(false);
     setLinkMessage('点击“开始连线”，再点选图谱节点');
-  }, [selectedNote?.id, selectedNote?.title, selectedNote?.body, selectedNote?.content]);
+    setExpandedCategories((current) => {
+      if (current.has(selectedNote.category)) return current;
+      const next = new Set(current);
+      next.add(selectedNote.category);
+      return next;
+    });
+  }, [selectedNote?.id, selectedNote?.title, selectedNote?.category, selectedNote?.body, selectedNote?.content]);
 
   function zoomIn() {
     setZoom((value) => Math.min(1.6, Number((value + 0.12).toFixed(2))));
@@ -559,6 +575,7 @@ function App() {
       setGraph(data.graph);
       setSelectedNoteId(data.note.id);
       setSelectedCategory(data.note.category);
+      setExpandedCategories((current) => new Set(current).add(data.note!.category));
       setEditorMode('edit');
       setApiMessage('已保存到后端');
       setCreateDraft(emptyNoteForm);
@@ -571,6 +588,7 @@ function App() {
       }));
       setSelectedNoteId(note.id);
       setSelectedCategory(note.category);
+      setExpandedCategories((current) => new Set(current).add(note.category));
       setEditorMode('edit');
       setCreateDraft(emptyNoteForm);
       setIsCreateOpen(false);
@@ -619,9 +637,13 @@ function App() {
 
       setGraph(data.graph);
       setSelectedNoteId(data.note.id);
+      setSelectedCategory(data.note.category);
+      setExpandedCategories((current) => new Set(current).add(data.note!.category));
       setDetailsMessage('已保存到后端');
     } catch (error) {
       patchGraphNote(selectedNote.id, patch);
+      setSelectedCategory(patch.category ?? selectedNote.category);
+      setExpandedCategories((current) => new Set(current).add(patch.category ?? selectedNote.category));
       setDetailsMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
     }
   }
@@ -700,7 +722,11 @@ function App() {
   }
 
   function toggleLinkTo(target: Note) {
-    if (!selectedNote || target.id === selectedNote.id) return;
+    if (!selectedNote) return;
+    if (target.id === selectedNote.id) {
+      setLinkMessage('请选择另一个知识点来连线');
+      return;
+    }
 
     const exists = isLinkedTo(selectedNote, target);
     const nextLinks = exists
@@ -721,6 +747,42 @@ function App() {
     }
 
     setSelectedNoteId(note.id);
+  }
+
+  function enterLinkMode() {
+    if (!selectedNote) return;
+    setIsLinking(true);
+    setLinkMessage('编辑面板已隐藏，现在点击其它知识点小球来连线或取消');
+  }
+
+  function exitLinkMode() {
+    setIsLinking(false);
+    setLinkMessage('已退出点选连线模式');
+  }
+
+  function toggleCategoryFolder(category: string) {
+    setSelectedCategory(category);
+    setExpandedCategories((current) => {
+      const next = new Set(current);
+      if (next.has(category)) {
+        next.delete(category);
+      } else {
+        next.add(category);
+      }
+      return next;
+    });
+  }
+
+  function openNoteFromSidebar(note: Note) {
+    setSelectedNoteId(note.id);
+    setSelectedCategory(note.category);
+    setEditorMode('edit');
+    setIsLinking(false);
+    setExpandedCategories((current) => {
+      const next = new Set(current);
+      next.add(note.category);
+      return next;
+    });
   }
 
   function updateCreateDraft(field: keyof NoteForm, value: string) {
@@ -764,15 +826,40 @@ function App() {
 
         <div className="sidebar-title">大类文件夹</div>
         <div className="tag-list">
-          {categories.map((category) => (
-            <button
-              key={category}
-              className={selectedCategory === category ? 'tag-button active' : 'tag-button'}
-              onClick={() => setSelectedCategory(category)}
-            >
-              <span>▸ {category}</span>
-              <small>{category === '全部' ? notes.length : notes.filter((note) => note.category === category).length}</small>
-            </button>
+          <button
+            className={selectedCategory === '全部' ? 'tag-button active' : 'tag-button'}
+            onClick={() => setSelectedCategory('全部')}
+          >
+            <span>全部知识点</span>
+            <small>{notes.length}</small>
+          </button>
+
+          {categoryFolders.map(({ category, notes: folderNotes }) => (
+            <div className="category-folder" key={category}>
+              <button
+                className={selectedCategory === category ? 'tag-button folder-button active' : 'tag-button folder-button'}
+                onClick={() => toggleCategoryFolder(category)}
+              >
+                <span>{expandedCategories.has(category) ? '▾' : '▸'} {category}</span>
+                <small>{folderNotes.length}</small>
+              </button>
+              {expandedCategories.has(category) && (
+                <div className="folder-note-list">
+                  {folderNotes.length > 0 ? folderNotes.map((note) => (
+                    <button
+                      key={note.id}
+                      className={selectedNoteId === note.id ? 'folder-note active' : 'folder-note'}
+                      onClick={() => openNoteFromSidebar(note)}
+                    >
+                      <span>{note.title}</span>
+                      <small>{noteTypeLabels[note.type]}</small>
+                    </button>
+                  )) : (
+                    <span className="folder-empty">这个大类还没有知识点</span>
+                  )}
+                </div>
+              )}
+            </div>
           ))}
         </div>
 
@@ -869,6 +956,7 @@ function App() {
                     width: note.size,
                     height: note.size,
                   }}
+                  onPointerDown={(event: { stopPropagation: () => void }) => event.stopPropagation()}
                   onClick={() => handleNodeClick(note)}
                 >
                   <span>{note.title}</span>
@@ -883,9 +971,19 @@ function App() {
             <span><i className="dot concept" />概念</span>
             <span><i className="dot detail" />细节</span>
           </div>
+
+          {isLinking && selectedNote && (
+            <div className="linking-toolbar" onPointerDown={(event: { stopPropagation: () => void }) => event.stopPropagation()}>
+              <div>
+                <strong>正在为「{selectedNote.title}」连线</strong>
+                <span>{linkMessage}</span>
+              </div>
+              <button onClick={exitLinkMode}>结束连线</button>
+            </div>
+          )}
         </div>
 
-        {selectedNote && (
+        {selectedNote && !isLinking && (
           <article className="note-panel">
             <div className="panel-header">
               <div>
@@ -1031,10 +1129,7 @@ function App() {
                 </div>
                 <button
                   className={isLinking ? 'link-mode-button active' : 'link-mode-button'}
-                  onClick={() => {
-                    setIsLinking((value) => !value);
-                    setLinkMessage(isLinking ? '已退出点选连线模式' : '现在点击图谱中的其它节点来连线或取消');
-                  }}
+                  onClick={isLinking ? exitLinkMode : enterLinkMode}
                 >
                   {isLinking ? '结束连线' : '开始连线'}
                 </button>
