@@ -198,10 +198,19 @@ function tagsFromNotes(notes: Note[]) {
   return ['全部', ...tagSet];
 }
 
+function categoriesFromNotes(notes: Note[]) {
+  const categorySet = new Set<string>();
+  for (const note of notes) {
+    categorySet.add(note.category || '未分类');
+  }
+  return ['全部', ...categorySet];
+}
+
 function graphWithTags(graph: GraphPayload): GraphPayload {
   return {
     ...graph,
     tags: tagsFromNotes(graph.notes),
+    categories: categoriesFromNotes(graph.notes),
   };
 }
 
@@ -209,9 +218,39 @@ function noteToForm(note: Note): NoteForm {
   return {
     title: note.title,
     type: note.type,
+    category: note.category,
     tags: joinList(note.tags),
     content: note.content,
-    links: joinList(note.links),
+    links: '',
+  };
+}
+
+function isLinkedTo(note: Note, target: Note) {
+  return note.links.includes(target.id) || note.links.includes(target.title);
+}
+
+function withSyncedEdges(graph: GraphPayload, noteId: string, nextLinks: string[]) {
+  const notes = graph.notes.map((note) => (note.id === noteId ? { ...note, links: nextLinks } : note));
+  const edges: Edge[] = [];
+  const seen = new Set<string>();
+
+  for (const source of notes) {
+    for (const link of source.links) {
+      const target = notes.find((note) => note.id === link || note.title === link);
+      if (!target || target.id === source.id) continue;
+
+      const edgeKey = [source.id, target.id].sort().join('::');
+      if (!seen.has(edgeKey)) {
+        seen.add(edgeKey);
+        edges.push([source.id, target.id, 0.58]);
+      }
+    }
+  }
+
+  return {
+    ...graph,
+    edges,
+    notes,
   };
 }
 
@@ -362,7 +401,7 @@ function renderMarkdown(markdown: string) {
 function App() {
   const [graph, setGraph] = useState<GraphPayload>(fallbackGraph);
   const [selectedNoteId, setSelectedNoteId] = useState('nn');
-  const [selectedTag, setSelectedTag] = useState('全部');
+  const [selectedCategory, setSelectedCategory] = useState('全部');
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -374,8 +413,10 @@ function App() {
   const [createDraft, setCreateDraft] = useState<NoteForm>(emptyNoteForm);
   const [detailsDraft, setDetailsDraft] = useState<NoteForm>(emptyNoteForm);
   const [detailsMessage, setDetailsMessage] = useState('基础信息可编辑');
+  const [isLinking, setIsLinking] = useState(false);
+  const [linkMessage, setLinkMessage] = useState('点击“开始连线”，再点选图谱节点');
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
-  const { notes, edges, tags } = graph;
+  const { notes, edges, categories } = graph;
 
   const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
   const selectedRelationCount = selectedNote?.links.length ?? 0;
@@ -383,9 +424,9 @@ function App() {
   const noteMap = useMemo<Record<string, Note>>(() => Object.fromEntries(notes.map((note) => [note.id, note])), [notes]);
 
   const visibleIds = useMemo(() => {
-    if (selectedTag === '全部') return new Set(notes.map((note) => note.id));
-    return new Set(notes.filter((note) => note.tags.includes(selectedTag)).map((note) => note.id));
-  }, [notes, selectedTag]);
+    if (selectedCategory === '全部') return new Set(notes.map((note) => note.id));
+    return new Set(notes.filter((note) => note.category === selectedCategory).map((note) => note.id));
+  }, [notes, selectedCategory]);
 
   const visibleEdges = edges.filter(([a, b]) => visibleIds.has(a) && visibleIds.has(b));
 
@@ -401,7 +442,7 @@ function App() {
 
         setGraph(data);
         setSelectedNoteId((current) => (data.notes.some((note) => note.id === current) ? current : data.notes[0]?.id ?? ''));
-        setSelectedTag((current) => (data.tags.includes(current) ? current : '全部'));
+        setSelectedCategory((current) => ((data.categories ?? categoriesFromNotes(data.notes)).includes(current) ? current : '全部'));
         setApiMessage('后端已连接');
       } catch {
         if (!ignored) {
@@ -423,6 +464,8 @@ function App() {
     setDetailsDraft(noteToForm(selectedNote));
     setSaveMessage('支持 Markdown、代码块和 LaTeX');
     setDetailsMessage('基础信息可编辑');
+    setIsLinking(false);
+    setLinkMessage('点击“开始连线”，再点选图谱节点');
   }, [selectedNote?.id, selectedNote?.title, selectedNote?.body, selectedNote?.content]);
 
   function zoomIn() {
@@ -474,6 +517,7 @@ function App() {
       id: `local-${Date.now().toString(36)}`,
       title,
       type: payload.type,
+      category: payload.category.trim() || '未分类',
       tags: splitList(payload.tags).slice(0, 8),
       x: Math.round((50 + Math.cos(angle) * 30) * 10) / 10,
       y: Math.round((48 + Math.sin(angle) * 25) * 10) / 10,
@@ -486,7 +530,7 @@ function App() {
     return {
       ...localNote,
       tags: localNote.tags.length > 0 ? localNote.tags : ['临时想法'],
-      links: localNote.links.length > 0 ? localNote.links : ['神经网络'],
+      links: localNote.links,
     };
   }
 
@@ -503,6 +547,7 @@ function App() {
         body: JSON.stringify({
           title: createDraft.title,
           type: createDraft.type,
+          category: createDraft.category,
           tags: splitList(createDraft.tags),
           content: createDraft.content,
           links: splitList(createDraft.links),
@@ -513,7 +558,7 @@ function App() {
 
       setGraph(data.graph);
       setSelectedNoteId(data.note.id);
-      setSelectedTag('全部');
+      setSelectedCategory(data.note.category);
       setEditorMode('edit');
       setApiMessage('已保存到后端');
       setCreateDraft(emptyNoteForm);
@@ -525,7 +570,7 @@ function App() {
         notes: [...current.notes, note],
       }));
       setSelectedNoteId(note.id);
-      setSelectedTag('全部');
+      setSelectedCategory(note.category);
       setEditorMode('edit');
       setCreateDraft(emptyNoteForm);
       setIsCreateOpen(false);
@@ -557,9 +602,9 @@ function App() {
     const patch: Partial<Note> = {
       title: detailsDraft.title.trim(),
       type: detailsDraft.type,
+      category: detailsDraft.category.trim() || '未分类',
       tags: splitList(detailsDraft.tags).slice(0, 8),
       content: detailsDraft.content.trim() || '这个知识点还没有摘要。',
-      links: splitList(detailsDraft.links).slice(0, 12),
     };
 
     try {
@@ -619,18 +664,63 @@ function App() {
 
       setGraph(data.graph);
       setSelectedNoteId(data.graph.notes[0]?.id ?? '');
-      setSelectedTag('全部');
+      setSelectedCategory('全部');
       setApiMessage('已从后端删除');
     } catch (error) {
       setGraph((current) => graphWithTags({
         notes: current.notes.filter((note) => note.id !== selectedNote.id),
         edges: current.edges.filter(([source, target]) => source !== selectedNote.id && target !== selectedNote.id),
         tags: current.tags,
+        categories: current.categories,
       }));
       setSelectedNoteId(fallbackSelection);
-      setSelectedTag('全部');
+      setSelectedCategory('全部');
       setApiMessage(error instanceof Error ? `${error.message}，已从当前页面移除` : '已从当前页面移除');
     }
+  }
+
+  async function saveLinks(noteId: string, nextLinks: string[], message: string) {
+    setGraph((current) => graphWithTags(withSyncedEdges(current, noteId, nextLinks)));
+    setLinkMessage(message);
+
+    try {
+      const response = await fetch(`${API_BASE}/notes/${encodeURIComponent(noteId)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ links: nextLinks }),
+      });
+      const data = (await response.json()) as { note?: Note; graph?: GraphPayload; error?: string };
+      if (!response.ok || !data.note || !data.graph) throw new Error(data.error ?? '连线保存失败');
+
+      setGraph(data.graph);
+      setLinkMessage('连线已保存到后端');
+    } catch (error) {
+      setLinkMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
+    }
+  }
+
+  function toggleLinkTo(target: Note) {
+    if (!selectedNote || target.id === selectedNote.id) return;
+
+    const exists = isLinkedTo(selectedNote, target);
+    const nextLinks = exists
+      ? selectedNote.links.filter((link) => link !== target.id && link !== target.title)
+      : [...selectedNote.links, target.title];
+
+    saveLinks(
+      selectedNote.id,
+      Array.from(new Set(nextLinks)).slice(0, 12),
+      exists ? `已取消与「${target.title}」的连线` : `已连接到「${target.title}」`
+    );
+  }
+
+  function handleNodeClick(note: Note) {
+    if (isLinking && selectedNote) {
+      toggleLinkTo(note);
+      return;
+    }
+
+    setSelectedNoteId(note.id);
   }
 
   function updateCreateDraft(field: keyof NoteForm, value: string) {
@@ -650,6 +740,12 @@ function App() {
 
   return (
     <main className="app-shell">
+      <datalist id="category-options">
+        {categories.filter((category) => category !== '全部').map((category) => (
+          <option key={category} value={category} />
+        ))}
+      </datalist>
+
       <aside className="sidebar">
         <div className="brand">
           <div className="brand-logo">🧠</div>
@@ -666,23 +762,23 @@ function App() {
           <input placeholder="搜索笔记 / 概念" />
         </label>
 
-        <div className="sidebar-title">标签</div>
+        <div className="sidebar-title">大类文件夹</div>
         <div className="tag-list">
-          {tags.map((tag) => (
+          {categories.map((category) => (
             <button
-              key={tag}
-              className={selectedTag === tag ? 'tag-button active' : 'tag-button'}
-              onClick={() => setSelectedTag(tag)}
+              key={category}
+              className={selectedCategory === category ? 'tag-button active' : 'tag-button'}
+              onClick={() => setSelectedCategory(category)}
             >
-              <span>{tag}</span>
-              <small>{tag === '全部' ? notes.length : notes.filter((note) => note.tags.includes(tag)).length}</small>
+              <span>▸ {category}</span>
+              <small>{category === '全部' ? notes.length : notes.filter((note) => note.category === category).length}</small>
             </button>
           ))}
         </div>
 
         <div className="ai-card">
-          <strong>✨ 自动关联</strong>
-          <p>第一版可以用 [[双链]]、标签和关键词匹配生成连线，后续再加入 embedding 做语义关联。</p>
+          <strong>手动连线</strong>
+          <p>打开一个知识点，点击“开始连线”，再点选图谱中的其它节点即可建立或取消连线。</p>
           <p className="api-status">{apiMessage}</p>
         </div>
       </aside>
@@ -704,7 +800,7 @@ function App() {
 
           <div className="graph-summary">
             <span>{notes.length} 个知识点</span>
-            <span>{edges.length} 条关联</span>
+            <span>{edges.length} 条手动连线</span>
           </div>
 
           <div className="zoom-tools">
@@ -762,17 +858,18 @@ function App() {
               const related = selectedNoteId
                 ? edges.some(([a, b]) => (a === selectedNoteId && b === note.id) || (b === selectedNoteId && a === note.id))
                 : false;
+              const linkedTarget = selectedNote && note.id !== selectedNote.id ? isLinkedTo(selectedNote, note) : false;
               return (
                 <button
                   key={note.id}
-                  className={`node node-${note.type} ${selected ? 'selected' : ''} ${!visible ? 'hidden-node' : ''} ${selectedNoteId && !selected && !related ? 'dim-node' : ''}`}
+                  className={`node node-${note.type} ${selected ? 'selected' : ''} ${!visible ? 'hidden-node' : ''} ${selectedNoteId && !selected && !related && !isLinking ? 'dim-node' : ''} ${isLinking && !selected ? 'link-pick-node' : ''} ${linkedTarget ? 'linked-target' : ''}`}
                   style={{
                     left: `${note.x}%`,
                     top: `${note.y}%`,
                     width: note.size,
                     height: note.size,
                   }}
-                  onClick={() => setSelectedNoteId(note.id)}
+                  onClick={() => handleNodeClick(note)}
                 >
                   <span>{note.title}</span>
                 </button>
@@ -806,12 +903,16 @@ function App() {
 
             <div className="note-stats">
               <span>
+                <b>{selectedNote.category}</b>
+                <small>大类</small>
+              </span>
+              <span>
                 <b>{noteTypeLabels[selectedNote.type]}</b>
                 <small>类型</small>
               </span>
               <span>
                 <b>{selectedRelationCount}</b>
-                <small>自动关联</small>
+                <small>手动连线</small>
               </span>
               <span>
                 <b>{selectedNote.tags.length}</b>
@@ -848,6 +949,15 @@ function App() {
                   </select>
                 </label>
                 <label className="wide-field">
+                  <span>大类文件夹</span>
+                  <input
+                    value={detailsDraft.category}
+                    placeholder="比如：牛顿力学"
+                    list="category-options"
+                    onChange={(event: { target: HTMLInputElement }) => updateDetailsDraft('category', event.target.value)}
+                  />
+                </label>
+                <label className="wide-field">
                   <span>标签</span>
                   <input
                     value={detailsDraft.tags}
@@ -861,17 +971,10 @@ function App() {
                     onChange={(event: { target: HTMLTextAreaElement }) => updateDetailsDraft('content', event.target.value)}
                   />
                 </label>
-                <label className="wide-field">
-                  <span>关联</span>
-                  <input
-                    value={detailsDraft.links}
-                    onChange={(event: { target: HTMLInputElement }) => updateDetailsDraft('links', event.target.value)}
-                  />
-                </label>
               </div>
 
               <div className="editor-actions compact-actions">
-                <span>标签和关联可以用中文逗号或英文逗号分隔</span>
+                <span>大类像文件夹名一样可自定义；连线请在下方开启点选模式</span>
                 <button className="open-note-button" onClick={saveNoteDetails}>保存信息</button>
               </div>
             </section>
@@ -921,11 +1024,35 @@ function App() {
             </section>
 
             <div className="relation-box">
-              <strong>🔗 自动关联</strong>
-              <div>
-                {selectedNote.links.map((link) => (
-                  <button key={link}>{link}</button>
-                ))}
+              <div className="relation-header">
+                <div>
+                  <strong>点选式连线</strong>
+                  <small>{linkMessage}</small>
+                </div>
+                <button
+                  className={isLinking ? 'link-mode-button active' : 'link-mode-button'}
+                  onClick={() => {
+                    setIsLinking((value) => !value);
+                    setLinkMessage(isLinking ? '已退出点选连线模式' : '现在点击图谱中的其它节点来连线或取消');
+                  }}
+                >
+                  {isLinking ? '结束连线' : '开始连线'}
+                </button>
+              </div>
+              <div className="relation-list">
+                {selectedNote.links.length > 0
+                  ? selectedNote.links.map((link) => (
+                    <button
+                      key={link}
+                      onClick={() => {
+                        const target = notes.find((note) => note.id === link || note.title === link);
+                        if (target) toggleLinkTo(target);
+                      }}
+                    >
+                      {link} ×
+                    </button>
+                  ))
+                  : <span className="empty-relations">还没有手动连线</span>}
               </div>
             </div>
 
@@ -974,10 +1101,19 @@ function App() {
                 </select>
               </label>
               <label>
+                <span>大类文件夹</span>
+                <input
+                  value={createDraft.category}
+                  placeholder="比如：牛顿力学"
+                  list="category-options"
+                  onChange={(event: { target: HTMLInputElement }) => updateCreateDraft('category', event.target.value)}
+                />
+              </label>
+              <label className="wide-field">
                 <span>标签</span>
                 <input
                   value={createDraft.tags}
-                  placeholder="AI，模型结构"
+                  placeholder="力学，定律"
                   onChange={(event: { target: HTMLInputElement }) => updateCreateDraft('tags', event.target.value)}
                 />
               </label>
@@ -989,18 +1125,10 @@ function App() {
                   onChange={(event: { target: HTMLTextAreaElement }) => updateCreateDraft('content', event.target.value)}
                 />
               </label>
-              <label className="wide-field">
-                <span>关联</span>
-                <input
-                  value={createDraft.links}
-                  placeholder="神经网络，Embedding"
-                  onChange={(event: { target: HTMLInputElement }) => updateCreateDraft('links', event.target.value)}
-                />
-              </label>
             </div>
 
             <div className="editor-actions modal-actions">
-              <span>创建后可以继续写 Markdown 正文和公式</span>
+              <span>大类可自命名；创建后可通过点选图谱节点来建立连线</span>
               <button className="open-note-button" onClick={createNote}>创建知识点</button>
             </div>
           </section>

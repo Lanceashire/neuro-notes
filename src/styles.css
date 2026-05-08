@@ -488,6 +488,19 @@ textarea:focus-visible {
   z-index: 10;
 }
 
+.node.link-pick-node {
+  box-shadow: 0 0 0 8px rgba(15, 159, 143, 0.12), 0 18px 42px rgba(49, 68, 92, 0.2);
+}
+
+.node.link-pick-node:hover {
+  transform: translate(-50%, -50%) scale(1.1);
+  box-shadow: 0 0 0 10px rgba(15, 159, 143, 0.2), 0 24px 64px rgba(15, 159, 143, 0.22);
+}
+
+.node.linked-target {
+  box-shadow: 0 0 0 9px rgba(217, 119, 6, 0.16), 0 22px 58px rgba(217, 119, 6, 0.2);
+}
+
 .hidden-node {
   opacity: 0.08;
   pointer-events: none;
@@ -535,14 +548,14 @@ textarea:focus-visible {
 .dot.detail { background: #eab308; }
 
 .note-panel {
-  position: absolute;
+  position: fixed;
   z-index: 50;
-  left: 12px;
-  right: 12px;
-  bottom: 12px;
-  max-height: min(58vh, 560px);
+  left: 50%;
+  top: 50%;
+  width: min(1120px, calc(100vw - 32px));
+  max-height: min(86vh, 900px);
   overflow: auto;
-  padding: 18px;
+  padding: 24px;
   border-radius: 8px;
   border: 1px solid rgba(191, 209, 223, 0.82);
   background: rgba(255, 255, 255, 0.9);
@@ -550,6 +563,7 @@ textarea:focus-visible {
   box-shadow: 0 28px 80px rgba(49, 68, 92, 0.2);
   scrollbar-color: rgba(37, 99, 235, 0.32) transparent;
   scrollbar-width: thin;
+  transform: translate(-50%, -50%);
 }
 
 .panel-header {
@@ -591,7 +605,7 @@ textarea:focus-visible {
 
 .note-stats {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(4, 1fr);
   gap: 12px;
   padding: 13px 0;
   border-top: 1px solid rgba(215, 226, 234, 0.9);
@@ -675,7 +689,7 @@ textarea:focus-visible {
 }
 
 .form-grid textarea {
-  min-height: 82px;
+  min-height: 132px;
   resize: vertical;
   line-height: 1.7;
 }
@@ -763,7 +777,7 @@ textarea:focus-visible {
 
 .markdown-editor {
   width: 100%;
-  min-height: 280px;
+  min-height: 440px;
   resize: vertical;
   border: 1px solid rgba(191, 209, 223, 0.88);
   border-radius: 8px;
@@ -783,7 +797,7 @@ textarea:focus-visible {
 }
 
 .markdown-preview {
-  min-height: 280px;
+  min-height: 440px;
   padding: 16px;
   border: 1px solid rgba(191, 209, 223, 0.88);
   border-radius: 8px;
@@ -933,10 +947,10 @@ textarea:focus-visible {
 }
 
 .create-modal {
-  width: min(560px, 100%);
+  width: min(760px, 100%);
   max-height: calc(100vh - 36px);
   overflow: auto;
-  padding: 20px;
+  padding: 24px;
   border: 1px solid rgba(191, 209, 223, 0.9);
   border-radius: 10px;
   background: rgba(255, 255, 255, 0.96);
@@ -951,11 +965,25 @@ textarea:focus-visible {
 
 .relation-box strong {
   display: block;
-  margin-bottom: 10px;
   color: var(--ink);
 }
 
-.relation-box div {
+.relation-box .relation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.relation-header small {
+  display: block;
+  margin-top: 4px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.relation-box .relation-list {
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
@@ -976,6 +1004,31 @@ textarea:focus-visible {
   border-color: rgba(15, 159, 143, 0.32);
 }
 
+.relation-box .link-mode-button {
+  flex: none;
+  padding: 8px 12px;
+  border-radius: 8px;
+  color: white;
+  background: linear-gradient(135deg, var(--blue), var(--teal));
+  border-color: transparent;
+  box-shadow: 0 12px 26px rgba(15, 159, 143, 0.16);
+}
+
+.relation-box .link-mode-button:hover {
+  background: linear-gradient(135deg, #1d5fd8, #0d9588);
+}
+
+.relation-box .link-mode-button.active {
+  color: white;
+  background: linear-gradient(135deg, var(--amber), #ef9d2f);
+  box-shadow: 0 12px 28px rgba(217, 119, 6, 0.2);
+}
+
+.empty-relations {
+  color: var(--muted);
+  font-size: 12px;
+}
+
 .open-note-button {
   margin-top: 16px;
 }
@@ -989,15 +1042,6 @@ textarea:focus-visible {
   .reset-button {
     display: inline-grid;
     place-items: center;
-  }
-
-  .note-panel {
-    left: auto;
-    right: 24px;
-    bottom: auto;
-    top: 92px;
-    width: 390px;
-    max-height: calc(100vh - 116px);
   }
 
   .legend {
@@ -1043,6 +1087,10 @@ textarea:focus-visible {
 
   .form-grid {
     grid-template-columns: 1fr;
+  }
+
+  .note-stats {
+    grid-template-columns: repeat(2, 1fr);
   }
 
   .editor-actions {

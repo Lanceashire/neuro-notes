@@ -176,15 +176,28 @@ function updateNote(noteId, payload, graph) {
   return note;
 }
 
-function syncEdgesForNote(note, graph) {
-  graph.edges = graph.edges.filter(([source, target]) => source !== note.id && target !== note.id);
+function syncEdgesForNote(_note, graph) {
+  graph.edges = buildEdgesFromLinks(graph.notes);
+}
 
-  const linkedNotes = graph.notes.filter((item) => note.links.includes(item.title) || note.links.includes(item.id));
-  for (const linkedNote of linkedNotes) {
-    if (linkedNote.id !== note.id) {
-      graph.edges.push([linkedNote.id, note.id, 0.52]);
+function buildEdgesFromLinks(notes) {
+  const edges = [];
+  const seen = new Set();
+
+  for (const source of notes) {
+    for (const link of source.links ?? []) {
+      const target = notes.find((note) => note.id === link || note.title === link);
+      if (!target || target.id === source.id) continue;
+
+      const edgeKey = [source.id, target.id].sort().join('::');
+      if (!seen.has(edgeKey)) {
+        seen.add(edgeKey);
+        edges.push([source.id, target.id, 0.58]);
+      }
     }
   }
+
+  return edges;
 }
 
 function deleteNote(noteId, graph) {
