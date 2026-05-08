@@ -430,6 +430,8 @@ function App() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
   const [newCategoryName, setNewCategoryName] = useState('');
   const [categoryMessage, setCategoryMessage] = useState('');
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isPanelOpen, setIsPanelOpen] = useState(true);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const { notes, edges, categories } = graph;
 
@@ -437,22 +439,47 @@ function App() {
   const selectedRelationCount = selectedNote?.links.length ?? 0;
   const renderedNote = useMemo(() => renderMarkdown(noteDraft), [noteDraft]);
   const noteMap = useMemo<Record<string, Note>>(() => Object.fromEntries(notes.map((note) => [note.id, note])), [notes]);
+  const normalizedSearch = searchQuery.trim().toLowerCase();
   const categoryFolders = useMemo(() => (
     categories
       .filter((category) => category !== '全部')
-      .map((category) => ({
-        category,
-        notes: notes.filter((note) => note.category === category),
-      }))
-  ), [categories, notes]);
+      .map((category) => {
+        const categoryMatches = category.toLowerCase().includes(normalizedSearch);
+        const folderNotes = notes.filter((note) => {
+          if (note.category !== category) return false;
+          if (!normalizedSearch || categoryMatches) return true;
+          return [
+            note.title,
+            note.content,
+            note.category,
+            ...note.tags,
+          ].some((value) => value.toLowerCase().includes(normalizedSearch));
+        });
+
+        return { category, notes: folderNotes, matches: categoryMatches || folderNotes.length > 0 };
+      })
+      .filter((folder) => !normalizedSearch || folder.matches)
+  ), [categories, notes, normalizedSearch]);
 
   const visibleIds = useMemo(() => {
     if (isLinking) return new Set(notes.map((note) => note.id));
-    if (selectedCategory === '全部') return new Set(notes.map((note) => note.id));
-    return new Set(notes.filter((note) => note.category === selectedCategory).map((note) => note.id));
-  }, [notes, selectedCategory, isLinking]);
+    const visibleNotes = notes.filter((note) => {
+      const inCategory = selectedCategory === '全部' || note.category === selectedCategory;
+      if (!inCategory) return false;
+      if (!normalizedSearch) return true;
+
+      return [
+        note.title,
+        note.content,
+        note.category,
+        ...note.tags,
+      ].some((value) => value.toLowerCase().includes(normalizedSearch));
+    });
+    return new Set(visibleNotes.map((note) => note.id));
+  }, [notes, selectedCategory, isLinking, normalizedSearch]);
 
   const visibleEdges = edges.filter(([a, b]) => visibleIds.has(a) && visibleIds.has(b));
+  const visibleNoteCount = notes.filter((note) => visibleIds.has(note.id)).length;
 
   useEffect(() => {
     let ignored = false;
@@ -509,6 +536,14 @@ function App() {
   function resetView() {
     setZoom(1);
     setPan({ x: 0, y: 0 });
+  }
+
+  function openCreateModal(category = selectedCategory) {
+    setCreateDraft({
+      ...emptyNoteForm,
+      category: category === '全部' ? emptyNoteForm.category : category,
+    });
+    setIsCreateOpen(true);
   }
 
   function handleWheel(event: WheelEvent<HTMLDivElement>) {
@@ -590,6 +625,7 @@ function App() {
       setSelectedNoteId(data.note.id);
       setSelectedCategory(data.note.category);
       setExpandedCategories((current) => new Set(current).add(data.note!.category));
+      setIsPanelOpen(true);
       setEditorMode('edit');
       setApiMessage('已保存到后端');
       setCreateDraft(emptyNoteForm);
@@ -603,6 +639,7 @@ function App() {
       setSelectedNoteId(note.id);
       setSelectedCategory(note.category);
       setExpandedCategories((current) => new Set(current).add(note.category));
+      setIsPanelOpen(true);
       setEditorMode('edit');
       setCreateDraft(emptyNoteForm);
       setIsCreateOpen(false);
@@ -653,6 +690,7 @@ function App() {
       setSelectedNoteId(data.note.id);
       setSelectedCategory(data.note.category);
       setExpandedCategories((current) => new Set(current).add(data.note!.category));
+      setIsPanelOpen(true);
       setDetailsMessage('已保存到后端');
     } catch (error) {
       patchGraphNote(selectedNote.id, patch);
@@ -701,6 +739,7 @@ function App() {
       setGraph(data.graph);
       setSelectedNoteId(data.graph.notes[0]?.id ?? '');
       setSelectedCategory('全部');
+      setIsPanelOpen(Boolean(data.graph.notes[0]));
       setApiMessage('已从后端删除');
     } catch (error) {
       setGraph((current) => graphWithTags({
@@ -711,6 +750,7 @@ function App() {
       }));
       setSelectedNoteId(fallbackSelection);
       setSelectedCategory('全部');
+      setIsPanelOpen(Boolean(fallbackSelection));
       setApiMessage(error instanceof Error ? `${error.message}，已从当前页面移除` : '已从当前页面移除');
     }
   }
@@ -761,6 +801,7 @@ function App() {
     }
 
     setSelectedNoteId(note.id);
+    setIsPanelOpen(true);
   }
 
   function enterLinkMode() {
@@ -792,6 +833,7 @@ function App() {
     setSelectedCategory(note.category);
     setEditorMode('edit');
     setIsLinking(false);
+    setIsPanelOpen(true);
     setExpandedCategories((current) => {
       const next = new Set(current);
       next.add(note.category);
@@ -872,11 +914,15 @@ function App() {
           </div>
         </div>
 
-        <button className="primary-button" onClick={() => setIsCreateOpen(true)}>＋ 新建知识点</button>
+        <button className="primary-button" onClick={() => openCreateModal()}>＋ 新建知识点</button>
 
         <label className="search-box">
           <span>⌕</span>
-          <input placeholder="搜索笔记 / 概念" />
+          <input
+            value={searchQuery}
+            placeholder="搜索笔记 / 概念"
+            onChange={(event: { target: HTMLInputElement }) => setSearchQuery(event.target.value)}
+          />
         </label>
 
         <div className="sidebar-title">大类文件夹</div>
@@ -928,12 +974,18 @@ function App() {
                       <small>{noteTypeLabels[note.type]}</small>
                     </button>
                   )) : (
-                    <span className="folder-empty">这个大类还没有知识点</span>
+                    <div className="folder-empty">
+                      <span>{normalizedSearch ? '没有匹配的知识点' : '这个大类还没有知识点'}</span>
+                      {!normalizedSearch && <button onClick={() => openCreateModal(category)}>在此新建</button>}
+                    </div>
                   )}
                 </div>
               )}
             </div>
           ))}
+          {categoryFolders.length === 0 && (
+            <div className="sidebar-empty">没有找到匹配的大类或知识点</div>
+          )}
         </div>
 
         <div className="ai-card">
@@ -955,12 +1007,16 @@ function App() {
 
           <label className="top-search">
             <span>⌕</span>
-            <input placeholder="搜索知识点，比如：反向传播" />
+            <input
+              value={searchQuery}
+              placeholder="搜索知识点，比如：反向传播"
+              onChange={(event: { target: HTMLInputElement }) => setSearchQuery(event.target.value)}
+            />
           </label>
 
           <div className="graph-summary">
-            <span>{notes.length} 个知识点</span>
-            <span>{edges.length} 条手动连线</span>
+            <span>{visibleNoteCount}/{notes.length} 个知识点</span>
+            <span>{visibleEdges.length}/{edges.length} 条手动连线</span>
           </div>
 
           <div className="zoom-tools">
@@ -1056,14 +1112,24 @@ function App() {
           )}
         </div>
 
-        {selectedNote && !isLinking && (
+        {selectedNote && !isLinking && !isPanelOpen && (
+          <div className="selected-note-dock">
+            <div>
+              <strong>{selectedNote.title}</strong>
+              <span>{selectedNote.category} · {selectedRelationCount} 条连线</span>
+            </div>
+            <button onClick={() => setIsPanelOpen(true)}>打开编辑</button>
+          </div>
+        )}
+
+        {selectedNote && !isLinking && isPanelOpen && (
           <article className="note-panel">
             <div className="panel-header">
               <div>
                 <p>已打开知识点</p>
                 <h2>{selectedNote.title}</h2>
               </div>
-              <button onClick={() => setSelectedNoteId('')} className="round-button">×</button>
+              <button onClick={() => setIsPanelOpen(false)} className="round-button">−</button>
             </div>
 
             <div className="tag-row">
