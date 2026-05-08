@@ -37,6 +37,15 @@ type NoteForm = {
   links: string;
 };
 
+declare global {
+  interface Window {
+    MathJax?: {
+      typesetPromise?: (elements?: HTMLElement[]) => Promise<void>;
+      typesetClear?: (elements?: HTMLElement[]) => void;
+    };
+  }
+}
+
 const API_BASE = 'http://127.0.0.1:8787/api';
 
 const fallbackNotes: Note[] = [
@@ -316,8 +325,8 @@ function renderInlineMarkdown(text: string, blockKey: string) {
     if (part.startsWith('`') && part.endsWith('`')) return <code key={key}>{part.slice(1, -1)}</code>;
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={key}>{part.slice(2, -2)}</strong>;
     if (part.startsWith('*') && part.endsWith('*')) return <em key={key}>{part.slice(1, -1)}</em>;
-    if (part.startsWith('\\(') && part.endsWith('\\)')) return <span className="math-inline" key={key}>{part.slice(2, -2)}</span>;
-    if (part.startsWith('$') && part.endsWith('$')) return <span className="math-inline" key={key}>{part.slice(1, -1)}</span>;
+    if (part.startsWith('\\(') && part.endsWith('\\)')) return <span className="math-inline" key={key}>{part}</span>;
+    if (part.startsWith('$') && part.endsWith('$')) return <span className="math-inline" key={key}>{`\\(${part.slice(1, -1)}\\)`}</span>;
     return part;
   });
 }
@@ -325,8 +334,7 @@ function renderInlineMarkdown(text: string, blockKey: string) {
 function renderMathBlock(formula: string, key: string) {
   return (
     <div className="math-block" key={key}>
-      <span>LaTeX</span>
-      <pre>{formula.trim()}</pre>
+      {`\\[${formula.trim()}\\]`}
     </div>
   );
 }
@@ -607,6 +615,23 @@ function App() {
       return next;
     });
   }, [selectedNote?.id, selectedNote?.title, selectedNote?.category, selectedNote?.body, selectedNote?.content]);
+
+  useEffect(() => {
+    if (!isPanelOpen || !selectedNote || (notePanelMode === 'edit' && editorMode !== 'preview')) return;
+
+    const typeset = () => {
+      if (!window.MathJax?.typesetPromise) return false;
+      window.MathJax.typesetClear?.();
+      window.MathJax.typesetPromise().catch(() => {
+        setSaveMessage('公式渲染失败，请检查 LaTeX 语法');
+      });
+      return true;
+    };
+
+    if (typeset()) return;
+    const timer = window.setTimeout(typeset, 600);
+    return () => window.clearTimeout(timer);
+  }, [renderedNote, isPanelOpen, selectedNote?.id, notePanelMode, editorMode]);
 
   function zoomIn() {
     setZoom((value) => Math.min(1.6, Number((value + 0.12).toFixed(2))));
