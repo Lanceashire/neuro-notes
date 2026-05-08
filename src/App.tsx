@@ -36,7 +36,25 @@ type NoteForm = {
   links: string;
 };
 
+type MarkdownSnippet = {
+  label: string;
+  value: string;
+  cursorOffset?: number;
+};
+
 const API_BASE = 'http://127.0.0.1:8787/api';
+
+const markdownSnippets: MarkdownSnippet[] = [
+  { label: '行内公式', value: '$x^2 + y^2 = z^2$', cursorOffset: 1 },
+  { label: '块级公式', value: '\n$$\nE = mc^2\n$$\n', cursorOffset: 4 },
+  { label: '分式', value: '\\frac{a+b}{c+d}' },
+  { label: '求和', value: '\\sum_{i=1}^{n} x_i' },
+  { label: '积分', value: '\\int_{a}^{b} f(x)\\,dx' },
+  { label: '矩阵', value: '\n$$\n\\begin{bmatrix}\na & b \\\\\nc & d\n\\end{bmatrix}\n$$\n', cursorOffset: 22 },
+  { label: '分段', value: '\n$$\nf(x)=\\begin{cases}\nx^2, & x \\ge 0 \\\\\n-x, & x < 0\n\\end{cases}\n$$\n', cursorOffset: 6 },
+  { label: '对齐推导', value: '\n$$\n\\begin{aligned}\na^2+b^2 &= c^2 \\\\\nx &= \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}\n\\end{aligned}\n$$\n', cursorOffset: 6 },
+  { label: '代码块', value: '\n```ts\nconst value = 1;\n```\n', cursorOffset: 7 },
+];
 
 const fallbackNotes: Note[] = [
   {
@@ -296,14 +314,16 @@ function isSpecialMarkdownLine(line: string) {
   return (
     trimmed.startsWith('#') ||
     trimmed.startsWith('```') ||
-    trimmed === '$$' ||
+    trimmed.startsWith('$$') ||
+    trimmed.startsWith('\\[') ||
     trimmed.startsWith('- ') ||
+    /^\d+\.\s+/.test(trimmed) ||
     trimmed.startsWith('> ')
   );
 }
 
 function renderInlineMarkdown(text: string, blockKey: string) {
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\$[^$\n]+\$)/g);
+  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\\\(.+?\\\)|\$[^$\n]+\$)/g);
 
   return parts.map((part, index) => {
     const key = `${blockKey}-${index}`;
@@ -311,9 +331,19 @@ function renderInlineMarkdown(text: string, blockKey: string) {
     if (part.startsWith('`') && part.endsWith('`')) return <code key={key}>{part.slice(1, -1)}</code>;
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={key}>{part.slice(2, -2)}</strong>;
     if (part.startsWith('*') && part.endsWith('*')) return <em key={key}>{part.slice(1, -1)}</em>;
+    if (part.startsWith('\\(') && part.endsWith('\\)')) return <span className="math-inline" key={key}>{part.slice(2, -2)}</span>;
     if (part.startsWith('$') && part.endsWith('$')) return <span className="math-inline" key={key}>{part.slice(1, -1)}</span>;
     return part;
   });
+}
+
+function renderMathBlock(formula: string, key: string) {
+  return (
+    <div className="math-block" key={key}>
+      <span>LaTeX</span>
+      <pre>{formula.trim()}</pre>
+    </div>
+  );
 }
 
 function renderMarkdown(markdown: string) {
@@ -349,15 +379,53 @@ function renderMarkdown(markdown: string) {
       continue;
     }
 
-    if (trimmed === '$$') {
+    if (trimmed.startsWith('$$')) {
       const formulaLines: string[] = [];
-      index += 1;
-      while (index < lines.length && lines[index].trim() !== '$$') {
-        formulaLines.push(lines[index]);
+      const firstLine = trimmed.slice(2);
+
+      if (firstLine.trim().endsWith('$$') && firstLine.trim().length > 2) {
+        formulaLines.push(firstLine.trim().slice(0, -2));
         index += 1;
+      } else {
+        if (firstLine.trim()) formulaLines.push(firstLine);
+        index += 1;
+        while (index < lines.length && !lines[index].trim().endsWith('$$')) {
+          formulaLines.push(lines[index]);
+          index += 1;
+        }
+        if (index < lines.length) {
+          const lastLine = lines[index].trim();
+          const beforeClose = lastLine.slice(0, -2);
+          if (beforeClose.trim()) formulaLines.push(beforeClose);
+          index += 1;
+        }
       }
-      index += 1;
-      blocks.push(<div className="math-block" key={key}>{formulaLines.join('\n')}</div>);
+      blocks.push(renderMathBlock(formulaLines.join('\n'), key));
+      continue;
+    }
+
+    if (trimmed.startsWith('\\[')) {
+      const formulaLines: string[] = [];
+      const firstLine = trimmed.slice(2);
+
+      if (firstLine.trim().endsWith('\\]') && firstLine.trim().length > 2) {
+        formulaLines.push(firstLine.trim().slice(0, -2));
+        index += 1;
+      } else {
+        if (firstLine.trim()) formulaLines.push(firstLine);
+        index += 1;
+        while (index < lines.length && !lines[index].trim().endsWith('\\]')) {
+          formulaLines.push(lines[index]);
+          index += 1;
+        }
+        if (index < lines.length) {
+          const lastLine = lines[index].trim();
+          const beforeClose = lastLine.slice(0, -2);
+          if (beforeClose.trim()) formulaLines.push(beforeClose);
+          index += 1;
+        }
+      }
+      blocks.push(renderMathBlock(formulaLines.join('\n'), key));
       continue;
     }
 
@@ -384,6 +452,22 @@ function renderMarkdown(markdown: string) {
             <li key={`${key}-${itemIndex}`}>{renderInlineMarkdown(item, `${key}-${itemIndex}`)}</li>
           ))}
         </ul>
+      );
+      continue;
+    }
+
+    if (/^\d+\.\s+/.test(trimmed)) {
+      const items: string[] = [];
+      while (index < lines.length && /^\d+\.\s+/.test(lines[index].trim())) {
+        items.push(lines[index].trim().replace(/^\d+\.\s+/, ''));
+        index += 1;
+      }
+      blocks.push(
+        <ol key={key}>
+          {items.map((item, itemIndex) => (
+            <li key={`${key}-${itemIndex}`}>{renderInlineMarkdown(item, `${key}-${itemIndex}`)}</li>
+          ))}
+        </ol>
       );
       continue;
     }
@@ -433,6 +517,7 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [isPanelOpen, setIsPanelOpen] = useState(true);
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
+  const markdownEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const { notes, edges, categories } = graph;
 
   const selectedNote = notes.find((note) => note.id === selectedNoteId) ?? null;
@@ -813,6 +898,27 @@ function App() {
   function exitLinkMode() {
     setIsLinking(false);
     setLinkMessage('已退出点选连线模式');
+  }
+
+  function insertMarkdownSnippet(snippet: MarkdownSnippet) {
+    setEditorMode('edit');
+    const textarea = markdownEditorRef.current;
+    const start = textarea?.selectionStart ?? noteDraft.length;
+    const end = textarea?.selectionEnd ?? noteDraft.length;
+    const selectedText = noteDraft.slice(start, end);
+    const insertText = selectedText
+      ? snippet.value.replace('x^2 + y^2 = z^2', selectedText).replace('E = mc^2', selectedText)
+      : snippet.value;
+    const nextDraft = `${noteDraft.slice(0, start)}${insertText}${noteDraft.slice(end)}`;
+    const nextCursor = start + (snippet.cursorOffset ?? insertText.length);
+
+    setNoteDraft(nextDraft);
+    setSaveMessage('已插入模板，有未保存修改');
+
+    requestAnimationFrame(() => {
+      markdownEditorRef.current?.focus();
+      markdownEditorRef.current?.setSelectionRange(nextCursor, nextCursor);
+    });
   }
 
   function toggleCategoryFolder(category: string) {
@@ -1222,7 +1328,7 @@ function App() {
               <div className="editor-header">
                 <div>
                   <strong>Markdown 笔记</strong>
-                  <small>{saveMessage}</small>
+                  <small>{saveMessage}；可以自由写 Markdown、代码块、行内公式和多行 LaTeX</small>
                 </div>
                 <div className="editor-tabs">
                   <button
@@ -1240,8 +1346,17 @@ function App() {
                 </div>
               </div>
 
+              <div className="markdown-toolbar" aria-label="Markdown 插入工具">
+                {markdownSnippets.map((snippet) => (
+                  <button key={snippet.label} onClick={() => insertMarkdownSnippet(snippet)}>
+                    {snippet.label}
+                  </button>
+                ))}
+              </div>
+
               {editorMode === 'edit' ? (
                 <textarea
+                  ref={markdownEditorRef}
                   className="markdown-editor"
                   value={noteDraft}
                   spellCheck={false}
@@ -1255,7 +1370,7 @@ function App() {
               )}
 
               <div className="editor-actions">
-                <span>代码块用 ```，公式用 $...$ 或 $$...$$</span>
+                <span>支持 $...$、\(...\)、$$...$$、\[...\]；选中文本后点模板会优先套用到选区。</span>
                 <button className="open-note-button" onClick={saveNoteBody}>保存笔记</button>
               </div>
             </section>

@@ -936,6 +936,35 @@ textarea:focus-visible {
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.16);
 }
 
+.markdown-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+  padding: 10px;
+  border: 1px solid rgba(215, 226, 234, 0.86);
+  border-radius: 8px;
+  background: rgba(248, 251, 255, 0.78);
+}
+
+.markdown-toolbar button {
+  padding: 7px 10px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: white;
+  border: 1px solid rgba(191, 209, 223, 0.72);
+  font-size: 12px;
+  font-weight: 800;
+  transition: transform 0.18s ease, color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
+}
+
+.markdown-toolbar button:hover {
+  transform: translateY(-1px);
+  color: #0f5f5a;
+  border-color: rgba(15, 159, 143, 0.32);
+  background: rgba(15, 159, 143, 0.08);
+}
+
 .markdown-editor {
   width: 100%;
   min-height: 440px;
@@ -993,7 +1022,8 @@ textarea:focus-visible {
   margin: 0 0 12px;
 }
 
-.markdown-preview ul {
+.markdown-preview ul,
+.markdown-preview ol {
   margin: 0 0 12px;
   padding-left: 22px;
 }
@@ -1060,7 +1090,7 @@ textarea:focus-visible {
 .math-block {
   margin: 14px 0;
   overflow: auto;
-  padding: 14px 16px;
+  padding: 0;
   border: 1px solid rgba(217, 119, 6, 0.24);
   border-radius: 8px;
   color: #6d3f00;
@@ -1068,6 +1098,24 @@ textarea:focus-visible {
   font-family: "Cambria Math", "Times New Roman", serif;
   font-size: 16px;
   line-height: 1.7;
+}
+
+.math-block span {
+  display: block;
+  padding: 8px 12px;
+  color: #8a5407;
+  background: rgba(217, 119, 6, 0.08);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 900;
+  letter-spacing: 0;
+}
+
+.math-block pre {
+  margin: 0;
+  overflow: auto;
+  padding: 14px 16px;
+  font: inherit;
   white-space: pre;
 }
 

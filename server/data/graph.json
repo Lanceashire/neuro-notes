@@ -165,6 +165,21 @@
       "content": "",
       "body": "# 你好\n\n\n\n## 代码片段\n\n```ts\nconst topic = \"你好\";\nconsole.log(topic);\n```\n\n## 公式\n\n$$\n$$",
       "links": []
+    },
+    {
+      "id": "不定积分-mow9llk2",
+      "title": "不定积分",
+      "type": "core",
+      "category": "高等数学",
+      "tags": [
+        "概念"
+      ],
+      "x": 80,
+      "y": 48,
+      "size": 68,
+      "content": "这是用来求原函数的一种方法",
+      "body": "# 不定积分\n\n这是用来求原函数的一种方法\n\n## 代码片段\n\n```ts\nconst topic = \"不定积分\";\nconsole.log(topic);\n```\n\n## 公式\n\n$$\nL = \\frac{1}{n}\\sum_{i=1}^{n}(y_i - \\hat{y}_i)^2\n$$",
+      "links": []
     }
   ],
   "edges": [
@@ -228,5 +243,10 @@
       "nn",
       0.58
     ]
+  ],
+  "categories": [
+    "神经网络",
+    "未分类",
+    "高等数学"
   ]
 }
