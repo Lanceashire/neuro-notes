@@ -6,9 +6,11 @@
   "scripts": {
     "api": "node server/index.js",
     "dev": "vite",
+    "dev:tablet": "vite --host 0.0.0.0",
     "dev:api": "node server/index.js",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "preview:tablet": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
     "@vitejs/plugin-react": "latest",

@@ -46,7 +46,19 @@ declare global {
   }
 }
 
-const API_BASE = 'http://127.0.0.1:8787/api';
+function resolveApiBase() {
+  const configuredApiBase = (import.meta as ImportMeta & { env?: { VITE_API_BASE?: string } }).env?.VITE_API_BASE;
+  if (configuredApiBase) return configuredApiBase.replace(/\/$/, '');
+
+  const { protocol, hostname } = window.location;
+  if (!hostname || hostname === 'localhost' || hostname === '127.0.0.1') {
+    return 'http://127.0.0.1:8787/api';
+  }
+
+  return `${protocol}//${hostname}:8787/api`;
+}
+
+const API_BASE = resolveApiBase();
 
 const fallbackNotes: Note[] = [
   {
