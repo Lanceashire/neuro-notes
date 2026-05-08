@@ -36,25 +36,7 @@ type NoteForm = {
   links: string;
 };
 
-type MarkdownSnippet = {
-  label: string;
-  value: string;
-  cursorOffset?: number;
-};
-
 const API_BASE = 'http://127.0.0.1:8787/api';
-
-const markdownSnippets: MarkdownSnippet[] = [
-  { label: '行内公式', value: '$x^2 + y^2 = z^2$', cursorOffset: 1 },
-  { label: '块级公式', value: '\n$$\nE = mc^2\n$$\n', cursorOffset: 4 },
-  { label: '分式', value: '\\frac{a+b}{c+d}' },
-  { label: '求和', value: '\\sum_{i=1}^{n} x_i' },
-  { label: '积分', value: '\\int_{a}^{b} f(x)\\,dx' },
-  { label: '矩阵', value: '\n$$\n\\begin{bmatrix}\na & b \\\\\nc & d\n\\end{bmatrix}\n$$\n', cursorOffset: 22 },
-  { label: '分段', value: '\n$$\nf(x)=\\begin{cases}\nx^2, & x \\ge 0 \\\\\n-x, & x < 0\n\\end{cases}\n$$\n', cursorOffset: 6 },
-  { label: '对齐推导', value: '\n$$\n\\begin{aligned}\na^2+b^2 &= c^2 \\\\\nx &= \\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}\n\\end{aligned}\n$$\n', cursorOffset: 6 },
-  { label: '代码块', value: '\n```ts\nconst value = 1;\n```\n', cursorOffset: 7 },
-];
 
 const fallbackNotes: Note[] = [
   {
@@ -323,11 +305,13 @@ function isSpecialMarkdownLine(line: string) {
 }
 
 function renderInlineMarkdown(text: string, blockKey: string) {
-  const parts = text.split(/(`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\\\(.+?\\\)|\$[^$\n]+\$)/g);
+  const parts = text.split(/(\[\[[^\]]+\]\]|#[^\s#，。,.!?；;：:]+|`[^`]+`|\*\*[^*]+\*\*|\*[^*]+\*|\\\(.+?\\\)|\$[^$\n]+\$)/g);
 
   return parts.map((part, index) => {
     const key = `${blockKey}-${index}`;
     if (!part) return null;
+    if (part.startsWith('[[') && part.endsWith(']]')) return <span className="wikilink" key={key}>{part.slice(2, -2)}</span>;
+    if (part.startsWith('#')) return <span className="inline-tag" key={key}>{part}</span>;
     if (part.startsWith('`') && part.endsWith('`')) return <code key={key}>{part.slice(1, -1)}</code>;
     if (part.startsWith('**') && part.endsWith('**')) return <strong key={key}>{part.slice(2, -2)}</strong>;
     if (part.startsWith('*') && part.endsWith('*')) return <em key={key}>{part.slice(1, -1)}</em>;
@@ -343,6 +327,18 @@ function renderMathBlock(formula: string, key: string) {
       <span>LaTeX</span>
       <pre>{formula.trim()}</pre>
     </div>
+  );
+}
+
+function renderListContent(item: string, key: string) {
+  const task = item.match(/^\[([ xX])\]\s+(.*)$/);
+  if (!task) return renderInlineMarkdown(item, key);
+
+  return (
+    <label className="task-preview">
+      <input type="checkbox" checked={task[1].toLowerCase() === 'x'} readOnly />
+      <span>{renderInlineMarkdown(task[2], key)}</span>
+    </label>
   );
 }
 
@@ -449,7 +445,7 @@ function renderMarkdown(markdown: string) {
       blocks.push(
         <ul key={key}>
           {items.map((item, itemIndex) => (
-            <li key={`${key}-${itemIndex}`}>{renderInlineMarkdown(item, `${key}-${itemIndex}`)}</li>
+            <li key={`${key}-${itemIndex}`}>{renderListContent(item, `${key}-${itemIndex}`)}</li>
           ))}
         </ul>
       );
@@ -465,7 +461,7 @@ function renderMarkdown(markdown: string) {
       blocks.push(
         <ol key={key}>
           {items.map((item, itemIndex) => (
-            <li key={`${key}-${itemIndex}`}>{renderInlineMarkdown(item, `${key}-${itemIndex}`)}</li>
+            <li key={`${key}-${itemIndex}`}>{renderListContent(item, `${key}-${itemIndex}`)}</li>
           ))}
         </ol>
       );
@@ -900,25 +896,104 @@ function App() {
     setLinkMessage('已退出点选连线模式');
   }
 
-  function insertMarkdownSnippet(snippet: MarkdownSnippet) {
-    setEditorMode('edit');
-    const textarea = markdownEditorRef.current;
-    const start = textarea?.selectionStart ?? noteDraft.length;
-    const end = textarea?.selectionEnd ?? noteDraft.length;
-    const selectedText = noteDraft.slice(start, end);
-    const insertText = selectedText
-      ? snippet.value.replace('x^2 + y^2 = z^2', selectedText).replace('E = mc^2', selectedText)
-      : snippet.value;
-    const nextDraft = `${noteDraft.slice(0, start)}${insertText}${noteDraft.slice(end)}`;
-    const nextCursor = start + (snippet.cursorOffset ?? insertText.length);
+  function replaceMarkdownRange(start: number, end: number, text: string, cursorOffset = text.length) {
+    const nextDraft = `${noteDraft.slice(0, start)}${text}${noteDraft.slice(end)}`;
+    const nextCursor = start + cursorOffset;
 
     setNoteDraft(nextDraft);
-    setSaveMessage('已插入模板，有未保存修改');
-
+    setSaveMessage('有未保存修改');
     requestAnimationFrame(() => {
       markdownEditorRef.current?.focus();
       markdownEditorRef.current?.setSelectionRange(nextCursor, nextCursor);
     });
+  }
+
+  function wrapMarkdownSelection(left: string, right = left) {
+    const textarea = markdownEditorRef.current;
+    if (!textarea) return;
+
+    const { selectionStart, selectionEnd } = textarea;
+    const selectedText = noteDraft.slice(selectionStart, selectionEnd);
+    const wrapped = `${left}${selectedText}${right}`;
+    replaceMarkdownRange(selectionStart, selectionEnd, wrapped, selectedText ? wrapped.length : left.length);
+  }
+
+  function handleMarkdownKeyDown(event: {
+    key: string;
+    shiftKey: boolean;
+    ctrlKey: boolean;
+    metaKey: boolean;
+    preventDefault: () => void;
+    currentTarget: HTMLTextAreaElement;
+  }) {
+    const textarea = event.currentTarget;
+    const { selectionStart, selectionEnd } = textarea;
+    const lineStart = noteDraft.lastIndexOf('\n', selectionStart - 1) + 1;
+    const currentLine = noteDraft.slice(lineStart, selectionStart);
+    const commandKey = event.ctrlKey || event.metaKey;
+
+    if (commandKey && event.key.toLowerCase() === 'b') {
+      event.preventDefault();
+      wrapMarkdownSelection('**');
+      return;
+    }
+
+    if (commandKey && event.key.toLowerCase() === 'i') {
+      event.preventDefault();
+      wrapMarkdownSelection('*');
+      return;
+    }
+
+    if (event.key === '$' && selectionStart !== selectionEnd) {
+      event.preventDefault();
+      wrapMarkdownSelection('$');
+      return;
+    }
+
+    if (event.key === '`' && selectionStart !== selectionEnd) {
+      event.preventDefault();
+      wrapMarkdownSelection('`');
+      return;
+    }
+
+    if (event.key === 'Tab') {
+      event.preventDefault();
+      if (event.shiftKey) {
+        const line = noteDraft.slice(lineStart);
+        const removeCount = line.startsWith('  ') ? 2 : line.startsWith('\t') ? 1 : 0;
+        if (removeCount > 0) {
+          replaceMarkdownRange(lineStart, lineStart + removeCount, '', Math.max(0, selectionStart - lineStart - removeCount));
+        }
+      } else {
+        replaceMarkdownRange(selectionStart, selectionEnd, '  ', 2);
+      }
+      return;
+    }
+
+    if (event.key === 'Enter') {
+      const emptyList = currentLine.match(/^(\s*)([-*+]\s+|- \[[ xX]\]\s+|\d+\.\s+)$/);
+      if (emptyList) {
+        event.preventDefault();
+        replaceMarkdownRange(lineStart, selectionStart, '', 0);
+        return;
+      }
+
+      const task = currentLine.match(/^(\s*)- \[[ xX]\]\s+.+/);
+      const bullet = currentLine.match(/^(\s*)[-*+]\s+.+/);
+      const ordered = currentLine.match(/^(\s*)(\d+)\.\s+.+/);
+      const nextPrefix = task
+        ? `${task[1]}- [ ] `
+        : bullet
+          ? `${bullet[1]}- `
+          : ordered
+            ? `${ordered[1]}${Number(ordered[2]) + 1}. `
+            : '';
+
+      if (nextPrefix) {
+        event.preventDefault();
+        replaceMarkdownRange(selectionStart, selectionEnd, `\n${nextPrefix}`, nextPrefix.length + 1);
+      }
+    }
   }
 
   function toggleCategoryFolder(category: string) {
@@ -1328,7 +1403,7 @@ function App() {
               <div className="editor-header">
                 <div>
                   <strong>Markdown 笔记</strong>
-                  <small>{saveMessage}；可以自由写 Markdown、代码块、行内公式和多行 LaTeX</small>
+                  <small>{saveMessage}；像 Obsidian 一样直接写 Markdown、[[双链]]、$...$ 和 $$...$$</small>
                 </div>
                 <div className="editor-tabs">
                   <button
@@ -1346,14 +1421,6 @@ function App() {
                 </div>
               </div>
 
-              <div className="markdown-toolbar" aria-label="Markdown 插入工具">
-                {markdownSnippets.map((snippet) => (
-                  <button key={snippet.label} onClick={() => insertMarkdownSnippet(snippet)}>
-                    {snippet.label}
-                  </button>
-                ))}
-              </div>
-
               {editorMode === 'edit' ? (
                 <textarea
                   ref={markdownEditorRef}
@@ -1364,13 +1431,14 @@ function App() {
                     setNoteDraft(event.target.value);
                     setSaveMessage('有未保存修改');
                   }}
+                  onKeyDown={handleMarkdownKeyDown}
                 />
               ) : (
                 <div className="markdown-preview">{renderedNote}</div>
               )}
 
               <div className="editor-actions">
-                <span>支持 $...$、\(...\)、$$...$$、\[...\]；选中文本后点模板会优先套用到选区。</span>
+                <span>直接输入 Obsidian 常用语法：$行内公式$、$$块级公式$$、```代码块```、- [ ] 任务、[[双链]]。</span>
                 <button className="open-note-button" onClick={saveNoteBody}>保存笔记</button>
               </div>
             </section>

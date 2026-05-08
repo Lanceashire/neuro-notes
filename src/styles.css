@@ -1022,35 +1022,6 @@ textarea:focus-visible {
   box-shadow: 0 8px 20px rgba(37, 99, 235, 0.16);
 }
 
-.markdown-toolbar {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-  padding: 10px;
-  border: 1px solid rgba(215, 226, 234, 0.86);
-  border-radius: 8px;
-  background: rgba(248, 251, 255, 0.78);
-}
-
-.markdown-toolbar button {
-  padding: 7px 10px;
-  border-radius: 8px;
-  color: var(--ink-soft);
-  background: white;
-  border: 1px solid rgba(191, 209, 223, 0.72);
-  font-size: 12px;
-  font-weight: 800;
-  transition: transform 0.18s ease, color 0.18s ease, border-color 0.18s ease, background 0.18s ease;
-}
-
-.markdown-toolbar button:hover {
-  transform: translateY(-1px);
-  color: #0f5f5a;
-  border-color: rgba(15, 159, 143, 0.32);
-  background: rgba(15, 159, 143, 0.08);
-}
-
 .markdown-editor {
   width: 100%;
   min-height: 440px;
@@ -1135,6 +1106,35 @@ textarea:focus-visible {
   color: #0f5f5a;
   background: rgba(15, 159, 143, 0.1);
   font-size: 0.9em;
+}
+
+.wikilink {
+  display: inline-flex;
+  padding: 1px 6px;
+  border-radius: 6px;
+  color: #1d4ed8;
+  background: rgba(37, 99, 235, 0.1);
+  font-weight: 800;
+}
+
+.inline-tag {
+  display: inline-flex;
+  padding: 1px 6px;
+  border-radius: 999px;
+  color: #0f5f5a;
+  background: rgba(15, 159, 143, 0.1);
+  font-weight: 800;
+}
+
+.task-preview {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.task-preview input {
+  margin-top: 0.35em;
+  accent-color: var(--teal);
 }
 
 .markdown-code {
