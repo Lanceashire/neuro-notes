@@ -1298,6 +1298,8 @@ function App() {
             {notes.map((note) => {
               const visible = visibleIds.has(note.id);
               const selected = selectedNoteId === note.id;
+              const categoryFocus = selectedCategory !== '全部' && !isLinking;
+              const inSelectedCategory = categoryFocus && note.category === selectedCategory;
               const related = selectedNoteId
                 ? edges.some(([a, b]) => (a === selectedNoteId && b === note.id) || (b === selectedNoteId && a === note.id))
                 : false;
@@ -1305,7 +1307,7 @@ function App() {
               return (
                 <button
                   key={note.id}
-                  className={`node node-${note.type} ${selected ? 'selected' : ''} ${!visible ? 'hidden-node' : ''} ${selectedNoteId && !selected && !related && !isLinking ? 'dim-node' : ''} ${isLinking && !selected ? 'link-pick-node' : ''} ${linkedTarget ? 'linked-target' : ''}`}
+                  className={`node node-${note.type} ${selected ? 'selected' : ''} ${!visible ? 'hidden-node' : ''} ${categoryFocus && inSelectedCategory && visible ? 'category-highlight-node' : ''} ${categoryFocus && !inSelectedCategory && !normalizedSearch ? 'category-background-node' : ''} ${selectedNoteId && !selected && !related && !isLinking && !inSelectedCategory ? 'dim-node' : ''} ${isLinking && !selected ? 'link-pick-node' : ''} ${linkedTarget ? 'linked-target' : ''}`}
                   style={{
                     left: `${note.x}%`,
                     top: `${note.y}%`,

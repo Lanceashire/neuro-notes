@@ -16,8 +16,7 @@
       "links": [
         "反向传播",
         "梯度下降",
-        "激活函数",
-        "损失函数"
+        "激活函数"
       ],
       "body": "# 神经网络\n\n神经网络是一种模仿生物神经系统的计算模型。它由输入层、隐藏层和输出层组成，通过权重、偏置和激活函数学习数据中的模式。\n\n## 代码片段\n\n```ts\nconst topic = \"神经网络\";\nconsole.log(topic);\n```\n\n## 公式\n\n$$\nL = \\frac{1}{n}\\sum_{i=1}^{n}(y_i - \\hat{y}_i)^2\n$$"
     },
@@ -179,7 +178,10 @@
       "size": 68,
       "content": "这是用来求原函数的一种方法",
       "body": "# 不定积分\n\n这是用来求原函数的一种方法\n\n## 代码片段\n\n```ts\nconst topic = \"不定积分\";\nconsole.log(topic);\n```\n\n## 公式\n\n$$\nL = \\frac{1}{n}\\sum_{i=1}^{n}(y_i - \\hat{y}_i)^2\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n$$",
-      "links": []
+      "links": [
+        "ReLU",
+        "梯度下降"
+      ]
     },
     {
       "id": "链表-mowoknpj",
@@ -211,11 +213,6 @@
     [
       "nn",
       "act",
-      0.58
-    ],
-    [
-      "nn",
-      "loss",
       0.58
     ],
     [
@@ -256,6 +253,16 @@
     [
       "emb",
       "nn",
+      0.58
+    ],
+    [
+      "不定积分-mow9llk2",
+      "relu",
+      0.58
+    ],
+    [
+      "不定积分-mow9llk2",
+      "gd",
       0.58
     ]
   ],
