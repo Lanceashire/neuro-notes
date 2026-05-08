@@ -1263,6 +1263,9 @@ function App() {
           onPointerLeave={() => setDragging(false)}
         >
           <div className="grid-bg" />
+          <div className="star-field star-field-far" />
+          <div className="star-field star-field-near" />
+          <div className="particle-stream" />
           <div
             className="graph-canvas"
             style={{
@@ -1272,9 +1275,23 @@ function App() {
             <svg className="edges" viewBox="0 0 1000 760" preserveAspectRatio="none">
               <defs>
                 <linearGradient id="edge" x1="0" x2="1" y1="0" y2="1">
-                  <stop offset="0%" stopColor="rgba(34,211,238,.88)" />
-                  <stop offset="100%" stopColor="rgba(168,85,247,.88)" />
+                  <stop offset="0%" stopColor="rgba(103,232,249,.95)" />
+                  <stop offset="52%" stopColor="rgba(59,130,246,.86)" />
+                  <stop offset="100%" stopColor="rgba(217,70,239,.9)" />
                 </linearGradient>
+                <filter id="edgeGlow" x="-20%" y="-20%" width="140%" height="140%">
+                  <feGaussianBlur stdDeviation="3.2" result="blur" />
+                  <feColorMatrix
+                    in="blur"
+                    type="matrix"
+                    values="0 0 0 0 0.25 0 0 0 0 0.85 0 0 0 0 1 0 0 0 0.55 0"
+                    result="glow"
+                  />
+                  <feMerge>
+                    <feMergeNode in="glow" />
+                    <feMergeNode in="SourceGraphic" />
+                  </feMerge>
+                </filter>
               </defs>
               {visibleEdges.map(([source, target, weight]) => {
                 const a = noteMap[source];
@@ -1290,6 +1307,8 @@ function App() {
                     stroke="url(#edge)"
                     strokeWidth={1.5 + weight * 3}
                     opacity={selectedNoteId ? (selected ? 0.9 : 0.16) : 0.48}
+                    strokeLinecap="round"
+                    filter="url(#edgeGlow)"
                   />
                 );
               })}
