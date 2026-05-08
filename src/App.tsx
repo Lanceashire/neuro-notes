@@ -26,6 +26,7 @@ type GraphPayload = {
 };
 
 type EditorMode = 'edit' | 'preview';
+type NotePanelMode = 'view' | 'edit';
 
 type NoteForm = {
   title: string;
@@ -512,6 +513,7 @@ function App() {
   const [categoryMessage, setCategoryMessage] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
   const [isPanelOpen, setIsPanelOpen] = useState(true);
+  const [notePanelMode, setNotePanelMode] = useState<NotePanelMode>('view');
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const markdownEditorRef = useRef<HTMLTextAreaElement | null>(null);
   const { notes, edges, categories } = graph;
@@ -707,6 +709,7 @@ function App() {
       setSelectedCategory(data.note.category);
       setExpandedCategories((current) => new Set(current).add(data.note!.category));
       setIsPanelOpen(true);
+      setNotePanelMode('edit');
       setEditorMode('edit');
       setApiMessage('已保存到后端');
       setCreateDraft(emptyNoteForm);
@@ -721,6 +724,7 @@ function App() {
       setSelectedCategory(note.category);
       setExpandedCategories((current) => new Set(current).add(note.category));
       setIsPanelOpen(true);
+      setNotePanelMode('edit');
       setEditorMode('edit');
       setCreateDraft(emptyNoteForm);
       setIsCreateOpen(false);
@@ -772,6 +776,7 @@ function App() {
       setSelectedCategory(data.note.category);
       setExpandedCategories((current) => new Set(current).add(data.note!.category));
       setIsPanelOpen(true);
+      setNotePanelMode('view');
       setDetailsMessage('已保存到后端');
     } catch (error) {
       patchGraphNote(selectedNote.id, patch);
@@ -821,6 +826,7 @@ function App() {
       setSelectedNoteId(data.graph.notes[0]?.id ?? '');
       setSelectedCategory('全部');
       setIsPanelOpen(Boolean(data.graph.notes[0]));
+      setNotePanelMode('view');
       setApiMessage('已从后端删除');
     } catch (error) {
       setGraph((current) => graphWithTags({
@@ -832,6 +838,7 @@ function App() {
       setSelectedNoteId(fallbackSelection);
       setSelectedCategory('全部');
       setIsPanelOpen(Boolean(fallbackSelection));
+      setNotePanelMode('view');
       setApiMessage(error instanceof Error ? `${error.message}，已从当前页面移除` : '已从当前页面移除');
     }
   }
@@ -883,6 +890,7 @@ function App() {
 
     setSelectedNoteId(note.id);
     setIsPanelOpen(true);
+    setNotePanelMode('view');
   }
 
   function enterLinkMode() {
@@ -1015,6 +1023,7 @@ function App() {
     setEditorMode('edit');
     setIsLinking(false);
     setIsPanelOpen(true);
+    setNotePanelMode('view');
     setExpandedCategories((current) => {
       const next = new Set(current);
       next.add(note.category);
@@ -1299,18 +1308,31 @@ function App() {
               <strong>{selectedNote.title}</strong>
               <span>{selectedNote.category} · {selectedRelationCount} 条连线</span>
             </div>
-            <button onClick={() => setIsPanelOpen(true)}>打开编辑</button>
+            <button onClick={() => {
+              setIsPanelOpen(true);
+              setNotePanelMode('view');
+            }}>查看笔记</button>
           </div>
         )}
 
         {selectedNote && !isLinking && isPanelOpen && (
-          <article className="note-panel">
+          <article className={`note-panel ${notePanelMode === 'view' ? 'reader-panel' : 'editor-panel'}`}>
             <div className="panel-header">
               <div>
-                <p>已打开知识点</p>
+                <p>{notePanelMode === 'view' ? '查看笔记' : '编辑知识点'}</p>
                 <h2>{selectedNote.title}</h2>
               </div>
-              <button onClick={() => setIsPanelOpen(false)} className="round-button">−</button>
+              <div className="panel-actions">
+                {notePanelMode === 'view' ? (
+                  <button className="open-note-button small-action" onClick={() => {
+                    setNotePanelMode('edit');
+                    setEditorMode('edit');
+                  }}>编辑</button>
+                ) : (
+                  <button className="ghost-action" onClick={() => setNotePanelMode('view')}>返回查看</button>
+                )}
+                <button onClick={() => setIsPanelOpen(false)} className="round-button">−</button>
+              </div>
             </div>
 
             <div className="tag-row">
@@ -1338,6 +1360,45 @@ function App() {
               </span>
             </div>
 
+            {notePanelMode === 'view' ? (
+              <>
+                <section className="note-reader">
+                  <p className="note-content">{selectedNote.content}</p>
+                  <div className="markdown-preview reader-preview">{renderedNote}</div>
+                </section>
+
+                <div className="relation-box">
+                  <div className="relation-header">
+                    <div>
+                      <strong>相关知识点</strong>
+                      <small>{selectedNote.links.length > 0 ? '点击标签可切换到对应知识点' : '还没有手动连线'}</small>
+                    </div>
+                    <button className="link-mode-button" onClick={enterLinkMode}>开始连线</button>
+                  </div>
+                  <div className="relation-list">
+                    {selectedNote.links.length > 0
+                      ? selectedNote.links.map((link) => {
+                        const target = notes.find((note) => note.id === link || note.title === link);
+                        return (
+                          <button
+                            key={link}
+                            onClick={() => {
+                              if (target) {
+                                setSelectedNoteId(target.id);
+                                setNotePanelMode('view');
+                              }
+                            }}
+                          >
+                            {link}
+                          </button>
+                        );
+                      })
+                      : <span className="empty-relations">可进入编辑或连线模式补充关联</span>}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
             <section className="details-editor">
               <div className="editor-header">
                 <div>
@@ -1473,6 +1534,8 @@ function App() {
               </div>
             </div>
 
+              </>
+            )}
           </article>
         )}
       </section>

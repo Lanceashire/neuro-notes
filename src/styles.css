@@ -813,11 +813,43 @@ textarea:focus-visible {
   transform: translate(-50%, -50%);
 }
 
+.note-panel.reader-panel {
+  width: min(760px, calc(100vw - 32px));
+  max-height: min(78vh, 760px);
+  padding: 22px;
+}
+
+.note-panel.editor-panel {
+  width: min(1120px, calc(100vw - 32px));
+}
+
 .panel-header {
   display: flex;
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.panel-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.small-action {
+  width: auto;
+  margin-top: 0;
+  padding: 10px 14px;
+}
+
+.ghost-action {
+  height: 40px;
+  padding: 0 12px;
+  border-radius: 8px;
+  color: var(--ink-soft);
+  background: #f5f9fc;
+  border: 1px solid var(--line);
+  font-weight: 800;
 }
 
 .panel-header p {
@@ -887,6 +919,16 @@ textarea:focus-visible {
   color: #475569;
   line-height: 1.85;
   font-size: 14px;
+}
+
+.note-reader {
+  margin-top: 16px;
+}
+
+.reader-preview {
+  min-height: 240px;
+  max-height: 42vh;
+  overflow: auto;
 }
 
 .details-editor {
