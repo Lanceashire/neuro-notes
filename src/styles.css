@@ -814,9 +814,14 @@ textarea:focus-visible {
 }
 
 .note-panel.reader-panel {
-  width: min(1040px, calc(100vw - 32px));
-  max-height: min(88vh, 920px);
-  padding: 28px;
+  inset: 14px;
+  left: 14px;
+  top: 14px;
+  width: auto;
+  max-height: none;
+  height: calc(100vh - 28px);
+  padding: 28px 34px;
+  transform: none;
 }
 
 .note-panel.editor-panel {
@@ -922,7 +927,7 @@ textarea:focus-visible {
 }
 
 .note-reader {
-  width: min(820px, 100%);
+  width: min(1080px, 100%);
   margin: 22px auto 0;
 }
 
@@ -1009,7 +1014,7 @@ textarea:focus-visible {
 }
 
 .reader-preview {
-  min-height: 460px;
+  min-height: calc(100vh - 410px);
   max-height: none;
   overflow: auto;
   padding: 22px;
@@ -1470,9 +1475,23 @@ textarea:focus-visible {
   .mobile-brand {
     display: none;
   }
+
+  .note-panel.reader-panel {
+    left: 328px;
+    right: 24px;
+    top: 22px;
+    bottom: 22px;
+    height: auto;
+  }
 }
 
 @media (max-width: 520px) {
+  .note-panel.reader-panel {
+    inset: 10px;
+    height: calc(100vh - 20px);
+    padding: 18px;
+  }
+
   .topbar {
     align-items: stretch;
     gap: 8px;
