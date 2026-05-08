@@ -12,7 +12,12 @@ async function readGraph() {
 }
 
 async function writeGraph(graph) {
-  await writeFile(DATA_FILE, `${JSON.stringify({ notes: graph.notes, edges: graph.edges }, null, 2)}\n`, 'utf8');
+  const normalized = withTags(graph);
+  await writeFile(DATA_FILE, `${JSON.stringify({
+    notes: normalized.notes,
+    edges: normalized.edges,
+    categories: normalized.categories.filter((category) => category !== '全部'),
+  }, null, 2)}\n`, 'utf8');
 }
 
 function withTags(graph) {
@@ -23,6 +28,13 @@ function withTags(graph) {
     category: note.category ?? '神经网络',
     body: note.body ?? createDefaultBody(note),
   }));
+
+  for (const category of graph.categories ?? []) {
+    const safeCategory = String(category).trim();
+    if (safeCategory && safeCategory !== '全部') {
+      categorySet.add(safeCategory);
+    }
+  }
 
   for (const note of notes) {
     categorySet.add(note.category);
@@ -136,6 +148,22 @@ function createNote(payload, graph) {
   return note;
 }
 
+function createCategory(payload, graph) {
+  const category = String(payload.name ?? payload.category ?? '').trim().slice(0, 48);
+  if (!category) {
+    throw new Error('大类名称不能为空');
+  }
+
+  const categories = withTags(graph).categories.filter((item) => item !== '全部');
+  if (!categories.includes(category)) {
+    graph.categories = [...categories, category];
+  } else {
+    graph.categories = categories;
+  }
+
+  return category;
+}
+
 function updateNote(noteId, payload, graph) {
   const note = graph.notes.find((item) => item.id === noteId);
   if (!note) return null;
@@ -229,6 +257,14 @@ const server = createServer(async (request, response) => {
 
     if (request.method === 'GET' && url.pathname === '/api/graph') {
       sendJson(response, 200, await readGraph());
+      return;
+    }
+
+    if (request.method === 'POST' && url.pathname === '/api/categories') {
+      const graph = await readGraph();
+      const category = createCategory(await readBody(request), graph);
+      await writeGraph(graph);
+      sendJson(response, 201, { category, graph: withTags(graph) });
       return;
     }
 

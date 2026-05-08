@@ -206,11 +206,23 @@ function categoriesFromNotes(notes: Note[]) {
   return ['全部', ...categorySet];
 }
 
+function categoriesFromGraph(graph: GraphPayload) {
+  const categorySet = new Set<string>();
+  for (const category of graph.categories ?? []) {
+    const safeCategory = category.trim();
+    if (safeCategory && safeCategory !== '全部') categorySet.add(safeCategory);
+  }
+  for (const note of graph.notes) {
+    categorySet.add(note.category || '未分类');
+  }
+  return ['全部', ...categorySet];
+}
+
 function graphWithTags(graph: GraphPayload): GraphPayload {
   return {
     ...graph,
     tags: tagsFromNotes(graph.notes),
-    categories: categoriesFromNotes(graph.notes),
+    categories: categoriesFromGraph(graph),
   };
 }
 
@@ -416,6 +428,8 @@ function App() {
   const [isLinking, setIsLinking] = useState(false);
   const [linkMessage, setLinkMessage] = useState('点击“开始连线”，再点选图谱节点');
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(() => new Set());
+  const [newCategoryName, setNewCategoryName] = useState('');
+  const [categoryMessage, setCategoryMessage] = useState('');
   const dragStart = useRef({ x: 0, y: 0, panX: 0, panY: 0 });
   const { notes, edges, categories } = graph;
 
@@ -785,6 +799,47 @@ function App() {
     });
   }
 
+  async function createCategoryFolder() {
+    const category = newCategoryName.trim();
+    if (!category) {
+      setCategoryMessage('请输入大类名称');
+      return;
+    }
+    if (categories.includes(category)) {
+      setSelectedCategory(category);
+      setExpandedCategories((current) => new Set(current).add(category));
+      setNewCategoryName('');
+      setCategoryMessage('这个大类已经存在');
+      return;
+    }
+
+    setGraph((current) => graphWithTags({
+      ...current,
+      categories: [...current.categories, category],
+    }));
+    setSelectedCategory(category);
+    setExpandedCategories((current) => new Set(current).add(category));
+    setNewCategoryName('');
+    setCategoryMessage('正在保存大类...');
+
+    try {
+      const response = await fetch(`${API_BASE}/categories`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: category }),
+      });
+      const data = (await response.json()) as { category?: string; graph?: GraphPayload; error?: string };
+      if (!response.ok || !data.category || !data.graph) throw new Error(data.error ?? '大类保存失败');
+
+      setGraph(data.graph);
+      setSelectedCategory(data.category);
+      setExpandedCategories((current) => new Set(current).add(data.category!));
+      setCategoryMessage('大类已创建');
+    } catch (error) {
+      setCategoryMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
+    }
+  }
+
   function updateCreateDraft(field: keyof NoteForm, value: string) {
     setCreateDraft((current) => ({
       ...current,
@@ -825,6 +880,24 @@ function App() {
         </label>
 
         <div className="sidebar-title">大类文件夹</div>
+        <div className="category-create">
+          <input
+            value={newCategoryName}
+            placeholder="新建大类，比如：牛顿力学"
+            onChange={(event: { target: HTMLInputElement }) => {
+              setNewCategoryName(event.target.value);
+              setCategoryMessage('');
+            }}
+            onKeyDown={(event: { key: string; preventDefault: () => void }) => {
+              if (event.key === 'Enter') {
+                event.preventDefault();
+                createCategoryFolder();
+              }
+            }}
+          />
+          <button onClick={createCategoryFolder}>新建</button>
+          {categoryMessage && <small>{categoryMessage}</small>}
+        </div>
         <div className="tag-list">
           <button
             className={selectedCategory === '全部' ? 'tag-button active' : 'tag-button'}
