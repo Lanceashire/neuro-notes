@@ -2,6 +2,7 @@ import { createServer } from 'node:http';
 import { readFile, writeFile } from 'node:fs/promises';
 
 const PORT = Number(process.env.PORT ?? 8787);
+const HOST = process.env.HOST ?? '0.0.0.0';
 const DATA_FILE = new URL('./data/graph.json', import.meta.url);
 const VALID_TYPES = new Set(['core', 'method', 'concept', 'detail']);
 
@@ -318,6 +319,6 @@ const server = createServer(async (request, response) => {
   }
 });
 
-server.listen(PORT, () => {
-  console.log(`NeuroNotes API listening on http://127.0.0.1:${PORT}`);
+server.listen(PORT, HOST, () => {
+  console.log(`NeuroNotes API listening on http://${HOST}:${PORT}`);
 });

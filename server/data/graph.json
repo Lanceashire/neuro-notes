@@ -178,7 +178,22 @@
       "y": 48,
       "size": 68,
       "content": "这是用来求原函数的一种方法",
-      "body": "# 不定积分\n\n这是用来求原函数的一种方法\n\n## 代码片段\n\n```ts\nconst topic = \"不定积分\";\nconsole.log(topic);\n```\n\n## 公式\n\n$$\nL = \\frac{1}{n}\\sum_{i=1}^{n}(y_i - \\hat{y}_i)^2\n$$",
+      "body": "# 不定积分\n\n这是用来求原函数的一种方法\n\n## 代码片段\n\n```ts\nconst topic = \"不定积分\";\nconsole.log(topic);\n```\n\n## 公式\n\n$$\nL = \\frac{1}{n}\\sum_{i=1}^{n}(y_i - \\hat{y}_i)^2\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n\n$$",
+      "links": []
+    },
+    {
+      "id": "链表-mowoknpj",
+      "title": "链表",
+      "type": "core",
+      "category": "数据结构",
+      "tags": [
+        "顺序表"
+      ],
+      "x": 80,
+      "y": 48,
+      "size": 68,
+      "content": "这是顺序表里面的一种实现方式，主要通过设尾指针或者头指针来实现",
+      "body": "# 链表\n\n这是顺序表里面的一种实现方式，主要通过设尾指针或者头指针来实现\n\n## 代码片段\n\n```ts\nstruct listNode{\n    int data;\n    int *rear;\n}*Node\n```\n\n## 公式\n\n$$\nL = \\frac{1}{n}\\sum_{i=1}^{n}(y_i - \\hat{y}_i)^2\n$$",
       "links": []
     }
   ],
@@ -247,6 +262,7 @@
   "categories": [
     "神经网络",
     "未分类",
-    "高等数学"
+    "高等数学",
+    "数据结构"
   ]
 }

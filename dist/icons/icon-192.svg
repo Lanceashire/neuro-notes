@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192" role="img" aria-label="NeuroNotes">
+  <rect width="192" height="192" rx="42" fill="#f8fbff"/>
+  <path d="M45 122c18-52 48-78 92-78 22 0 35 13 35 32 0 30-35 70-82 70-24 0-39-9-45-24Z" fill="#2563eb" opacity=".15"/>
+  <circle cx="66" cy="72" r="15" fill="#2563eb"/>
+  <circle cx="126" cy="62" r="13" fill="#0f9f8f"/>
+  <circle cx="134" cy="124" r="17" fill="#d97706"/>
+  <circle cx="76" cy="132" r="12" fill="#239160"/>
+  <path d="M78 76l36-9M78 126l43-2M76 84l48 31" stroke="#132033" stroke-width="8" stroke-linecap="round" opacity=".72"/>
+</svg>
