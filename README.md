@@ -1,119 +1,207 @@
-# NeuroNotes Prototype
+# NeuroNotes
 
-一个移动端 / 平板 / 桌面都能用的知识图谱笔记前端原型。
+一个知识图谱式笔记应用。  
+现在这个仓库已经包含：
 
-## 现在已有的交互
+- 前端主界面
+- 轻量级本地 Node API
+- 离线本地存储兜底
+- Android Capacitor 壳工程
 
-- 知识点节点展示
-- 节点自动连线视觉效果
-- 点击节点打开内容面板
-- 放大 / 缩小 / 重置视图
-- 好吧我也不知道这个到底会变成什么样因为已经有一个超级牛逼的黑曜石了，但这是我第一个github项目我想继续做下去
-- 鼠标滚轮缩放
-- 拖动画布平移
-- 标签筛选
-- 手机和平板响应式布局
-- 比obsidian更加轻便好用的
-## 本地运行
-##
-以下为工作方式
-##
+用户可以在图谱里创建大类、创建知识点、点击节点查看笔记、进入编辑页写 Markdown / 代码块 / LaTeX 公式，并手动点选连线。
+
+## 现在能做什么
+
+- 左侧按大类文件夹展开知识点
+- 图谱节点点击查看笔记
+- 编辑知识点标题、分类、标签、摘要
+- 编辑完整 Markdown 笔记
+- 支持代码块
+- 支持 `$...$`、`$$...$$`、`\(...\)`、`\[...\]` 数学公式
+- 支持 `[[双链]]` 风格内容
+- 手动点选知识点建立连线
+- 后端可用时保存到 `server/data/graph.json`
+- 后端不可用时自动退回浏览器本地存储
+- 已接入 Android 打包工程
+
+## 目录说明
+
+- `src/`：前端 React + TypeScript 页面
+- `server/`：轻量级本地 API 与示例数据
+- `public/`：PWA 资源
+- `android/`：Capacitor Android 工程
+- `dist/`：前端构建产物
+
+## 环境要求
+
+### Web / 本地开发
+
+- Node.js 18+
+- npm
+
+### Android 打包
+
+- JDK 21
+- Android SDK
+- Windows 下建议把项目放在纯英文路径
+
+如果项目路径里有中文，Android Gradle 可能报 `non-ASCII characters`。  
+临时绕过方式是在 `android/gradle.properties` 里加入：
+
+```properties
+android.overridePathCheck=true
+```
+
+## 本地开发
+
+先安装依赖：
+
 ```bash
 npm install
+```
+
+### 方式 1：前端 + 本地 API
+
+开两个终端。
+
+终端 1：
+
+```bash
 npm run dev
+```
+
+终端 2：
+
+```bash
 npm run api
 ```
-##
-分为两个终端 打开npn run dev后再打开npm run api就能实现最基本的前后端交互
-##
 
-
-然后打开终端里显示的本地地址，比如：
+然后打开终端里显示的地址，默认一般是：
 
 ```bash
 http://localhost:5173
 ```
 
-## 下一步建议
-说实话我还没想好
-# NeuroNotes
+这种方式下，数据会保存到：
 
-NeuroNotes is a mobile-first knowledge graph note-taking app.
-
-It turns notes, concepts, and tags into an interactive graph. Users can zoom, pan, and tap any node to view related content.
-
-## Preview
-
-NeuroNotes is currently an early frontend prototype.
-
-Current prototype features:
-
-- Interactive knowledge graph
-- Mobile and tablet friendly layout
-- Zoom and pan canvas
-- Tap nodes to open note content
-- Tag filtering
-- Auto-connected concept relationships
-- Dark futuristic UI
-
-## Tech Stack
-
-- React
-- Vite
-- TypeScript
-- CSS
-
-## Getting Started
-
-Clone the project:
-
-```bash
-git clone https://github.com/Lanceashire/neuro-notes.git
-cd neuro-notes
+```text
+server/data/graph.json
 ```
 
-Install dependencies:
-
-```bash
-npm install
-```
-
-Run the development server:
+### 方式 2：只跑前端
 
 ```bash
 npm run dev
 ```
 
-Then open the local address shown in the terminal.
+如果本地 API 没启动，应用会自动切到浏览器本地存储模式，依然可以创建、编辑、删除笔记，只是数据不会写回 `server/data/graph.json`。
 
-## Project Vision
+## 平板 / 局域网访问
 
-NeuroNotes aims to become a visual note-taking tool where related knowledge points are automatically connected.
+如果你想让同一局域网里的平板或手机访问开发环境：
 
-Instead of only writing notes in a list, users can explore their knowledge as a graph:
+前端：
 
-- Notes become nodes
-- Related concepts become edges
-- Tags become clusters
-- Users can zoom, pan, and open each note from the graph
+```bash
+npm run dev:tablet
+```
 
-## Roadmap
+后端：
 
-- [x] Create frontend prototype
-- [x] Display knowledge graph nodes
-- [x] Add zoom and pan interaction
-- [x] Open note content by clicking nodes
-- [x] Add tag filtering
-- [ ] Create new notes
-- [ ] Edit notes
-- [ ] Delete notes
-- [ ] Save notes locally
-- [ ] Support `[[double links]]`
-- [ ] Generate graph from real notes
-- [ ] Export notes as Markdown
-- [ ] Add PWA support
-- [ ] Add AI-powered semantic linking
+```bash
+npm run dev:api
+```
 
-## License
+然后用你电脑的局域网 IP 打开：
 
-This project is currently under active development.
+```text
+http://你的局域网IP:5173
+```
+
+后端默认在：
+
+```text
+http://你的局域网IP:8787
+```
+
+## 构建前端
+
+```bash
+npm run build
+```
+
+构建完成后产物在：
+
+```text
+dist/
+```
+
+本地预览：
+
+```bash
+npm run preview
+```
+
+## Android 打包
+
+仓库已经接入 Capacitor，相关命令如下：
+
+```bash
+npm run android:copy
+npm run android:sync
+npm run android:open
+```
+
+### 首次生成或同步 Android 工程
+
+如果 `android/` 已存在，通常只需要：
+
+```bash
+npm run build
+npm run android:sync
+```
+
+### Windows 下命令行打 debug APK
+
+PowerShell 里先设置环境变量：
+
+```powershell
+$env:JAVA_HOME="C:\Program Files\Microsoft\jdk-21.0.9.10-hotspot"
+$env:ANDROID_HOME="C:\Users\lenovo\AppData\Local\Android\Sdk"
+$env:ANDROID_SDK_ROOT=$env:ANDROID_HOME
+$env:GRADLE_USER_HOME="$PWD\.gradle-cache"
+```
+
+然后进入 Android 工程：
+
+```powershell
+cd android
+.\gradlew.bat assembleDebug
+```
+
+生成后的 APK 默认在：
+
+```text
+android/app/build/outputs/apk/debug/app-debug.apk
+```
+
+## 当前仓库里你最常用的命令
+
+```bash
+npm install
+npm run dev
+npm run api
+npm run build
+npm run android:sync
+```
+
+## 已知事项
+
+- Android 打包时请优先使用 JDK 21，不要用 JDK 25
+- Windows 中文路径可能导致 Android 构建失败
+- `node_modules/`、`.gradle-cache/`、`.npm-cache/`、`android/app/build/` 这类目录不建议提交
+
+## 当前状态
+
+这不是一个只停留在静态原型的仓库了。  
+它现在已经可以作为一个轻量级知识图谱笔记系统继续开发和使用。
