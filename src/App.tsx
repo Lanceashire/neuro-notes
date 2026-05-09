@@ -1,4 +1,4 @@
-import { PointerEvent, WheelEvent, useEffect, useMemo, useRef, useState } from 'react';
+﻿import { PointerEvent, WheelEvent, useEffect, useMemo, useRef, useState } from 'react';
 
 type NoteType = 'core' | 'method' | 'concept' | 'detail';
 
@@ -43,6 +43,9 @@ declare global {
       typesetPromise?: (elements?: HTMLElement[]) => Promise<void>;
       typesetClear?: (elements?: HTMLElement[]) => void;
     };
+    Capacitor?: {
+      isNativePlatform?: () => boolean;
+    };
   }
 }
 
@@ -59,6 +62,7 @@ function resolveApiBase() {
 }
 
 const API_BASE = resolveApiBase();
+const LOCAL_GRAPH_KEY = 'neuro-notes-local-graph-v1';
 
 const fallbackNotes: Note[] = [
   {
@@ -248,6 +252,57 @@ function graphWithTags(graph: GraphPayload): GraphPayload {
   };
 }
 
+function buildEdgesFromLinks(notes: Note[]): Edge[] {
+  const edges: Edge[] = [];
+  const seen = new Set<string>();
+
+  for (const source of notes) {
+    for (const link of source.links) {
+      const target = notes.find((note) => note.id === link || note.title === link);
+      if (!target || target.id === source.id) continue;
+
+      const edgeKey = [source.id, target.id].sort().join('::');
+      if (!seen.has(edgeKey)) {
+        seen.add(edgeKey);
+        edges.push([source.id, target.id, 0.58]);
+      }
+    }
+  }
+
+  return edges;
+}
+
+function readStoredGraph() {
+  try {
+    const raw = window.localStorage.getItem(LOCAL_GRAPH_KEY);
+    if (!raw) return null;
+
+    const parsed = JSON.parse(raw) as Partial<GraphPayload>;
+    if (!Array.isArray(parsed.notes)) return null;
+
+    return graphWithTags({
+      notes: parsed.notes as Note[],
+      edges: Array.isArray(parsed.edges) ? parsed.edges as Edge[] : buildEdgesFromLinks(parsed.notes as Note[]),
+      tags: Array.isArray(parsed.tags) ? parsed.tags as string[] : [],
+      categories: Array.isArray(parsed.categories) ? parsed.categories as string[] : [],
+    });
+  } catch {
+    return null;
+  }
+}
+
+function writeStoredGraph(graph: GraphPayload) {
+  try {
+    window.localStorage.setItem(LOCAL_GRAPH_KEY, JSON.stringify(graphWithTags(graph)));
+  } catch {
+    // Ignore storage failures and keep the session usable in memory.
+  }
+}
+
+function isNativeShell() {
+  return Boolean(window.Capacitor?.isNativePlatform?.());
+}
+
 function noteToForm(note: Note): NoteForm {
   return {
     title: note.title,
@@ -265,25 +320,10 @@ function isLinkedTo(note: Note, target: Note) {
 
 function withSyncedEdges(graph: GraphPayload, noteId: string, nextLinks: string[]) {
   const notes = graph.notes.map((note) => (note.id === noteId ? { ...note, links: nextLinks } : note));
-  const edges: Edge[] = [];
-  const seen = new Set<string>();
-
-  for (const source of notes) {
-    for (const link of source.links) {
-      const target = notes.find((note) => note.id === link || note.title === link);
-      if (!target || target.id === source.id) continue;
-
-      const edgeKey = [source.id, target.id].sort().join('::');
-      if (!seen.has(edgeKey)) {
-        seen.add(edgeKey);
-        edges.push([source.id, target.id, 0.58]);
-      }
-    }
-  }
 
   return {
     ...graph,
-    edges,
+    edges: buildEdgesFromLinks(notes),
     notes,
   };
 }
@@ -515,6 +555,7 @@ function App() {
   const [graph, setGraph] = useState<GraphPayload>(fallbackGraph);
   const [selectedNoteId, setSelectedNoteId] = useState('nn');
   const [selectedCategory, setSelectedCategory] = useState('全部');
+  const [useLocalOnly, setUseLocalOnly] = useState(false);
   const [zoom, setZoom] = useState(1);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [dragging, setDragging] = useState(false);
@@ -584,10 +625,29 @@ function App() {
   const visibleEdges = edges.filter(([a, b]) => visibleIds.has(a) && visibleIds.has(b));
   const visibleNoteCount = notes.filter((note) => visibleIds.has(note.id)).length;
 
+  function commitGraph(nextGraph: GraphPayload) {
+    const normalized = graphWithTags(nextGraph);
+    setGraph(normalized);
+    writeStoredGraph(normalized);
+    return normalized;
+  }
+
   useEffect(() => {
     let ignored = false;
 
     async function loadGraph() {
+      const storedGraph = readStoredGraph();
+
+      if (isNativeShell() && storedGraph) {
+        if (ignored) return;
+        setUseLocalOnly(true);
+        setGraph(storedGraph);
+        setSelectedNoteId(storedGraph.notes[0]?.id ?? '');
+        setSelectedCategory('全部');
+        setApiMessage('正在使用设备本地数据');
+        return;
+      }
+
       try {
         const response = await fetch(`${API_BASE}/graph`);
         if (!response.ok) throw new Error(`后端返回 ${response.status}`);
@@ -595,12 +655,20 @@ function App() {
         if (ignored) return;
 
         setGraph(data);
+        writeStoredGraph(data);
+        setUseLocalOnly(false);
         setSelectedNoteId((current) => (data.notes.some((note) => note.id === current) ? current : data.notes[0]?.id ?? ''));
         setSelectedCategory((current) => ((data.categories ?? categoriesFromNotes(data.notes)).includes(current) ? current : '全部'));
         setApiMessage('后端已连接');
       } catch {
         if (!ignored) {
-          setApiMessage('后端未启动，正在使用本地示例数据');
+          const localGraph = graphWithTags(storedGraph ?? fallbackGraph);
+          setGraph(localGraph);
+          writeStoredGraph(localGraph);
+          setUseLocalOnly(true);
+          setSelectedNoteId((current) => (localGraph.notes.some((note) => note.id === current) ? current : localGraph.notes[0]?.id ?? ''));
+          setSelectedCategory((current) => (localGraph.categories.includes(current) ? current : '全部'));
+          setApiMessage(storedGraph ? '后端未连接，正在使用本地数据' : '后端未启动，正在使用本地离线数据');
         }
       }
     }
@@ -719,9 +787,34 @@ function App() {
     };
   }
 
+  function addLocalNote(payload: NoteForm) {
+    const note = makeLocalNote(payload);
+    const nextNotes = [...graph.notes, note];
+    const nextGraph = commitGraph({
+      ...graph,
+      notes: nextNotes,
+      edges: buildEdgesFromLinks(nextNotes),
+    });
+    return { note, graph: nextGraph };
+  }
+
   async function createNote() {
     if (!createDraft.title.trim()) {
       setApiMessage('请先填写知识点标题');
+      return;
+    }
+
+    if (useLocalOnly) {
+      const { note } = addLocalNote(createDraft);
+      setSelectedNoteId(note.id);
+      setSelectedCategory(note.category);
+      setExpandedCategories((current) => new Set(current).add(note.category));
+      setIsPanelOpen(true);
+      setNotePanelMode('edit');
+      setEditorMode('edit');
+      setApiMessage('已保存到当前设备');
+      setCreateDraft(emptyNoteForm);
+      setIsCreateOpen(false);
       return;
     }
 
@@ -742,6 +835,8 @@ function App() {
       if (!response.ok || !data.note || !data.graph) throw new Error(data.error ?? '保存失败');
 
       setGraph(data.graph);
+      writeStoredGraph(data.graph);
+      setUseLocalOnly(false);
       setSelectedNoteId(data.note.id);
       setSelectedCategory(data.note.category);
       setExpandedCategories((current) => new Set(current).add(data.note!.category));
@@ -752,35 +847,33 @@ function App() {
       setCreateDraft(emptyNoteForm);
       setIsCreateOpen(false);
     } catch (error) {
-      const note = makeLocalNote(createDraft);
-      setGraph((current) => graphWithTags({
-        ...current,
-        notes: [...current.notes, note],
-      }));
+      const { note } = addLocalNote(createDraft);
       setSelectedNoteId(note.id);
       setSelectedCategory(note.category);
       setExpandedCategories((current) => new Set(current).add(note.category));
       setIsPanelOpen(true);
       setNotePanelMode('edit');
       setEditorMode('edit');
+      setUseLocalOnly(true);
       setCreateDraft(emptyNoteForm);
       setIsCreateOpen(false);
-      setApiMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
+      setApiMessage(error instanceof Error ? `${error.message}，已切换为本地保存` : '已切换为本地保存');
     }
   }
 
   function patchNoteLocally(noteId: string, patch: Partial<Note>) {
-    setGraph((current) => graphWithTags({
-      ...current,
-      notes: current.notes.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
-    }));
+    setGraph((current) => {
+      const nextGraph = graphWithTags({
+        ...current,
+        notes: current.notes.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
+      });
+      writeStoredGraph(nextGraph);
+      return nextGraph;
+    });
   }
 
   function patchGraphNote(noteId: string, patch: Partial<Note>) {
-    setGraph((current) => graphWithTags({
-      ...current,
-      notes: current.notes.map((note) => (note.id === noteId ? { ...note, ...patch } : note)),
-    }));
+    patchNoteLocally(noteId, patch);
   }
 
   async function saveNoteDetails() {
@@ -798,6 +891,16 @@ function App() {
       content: detailsDraft.content.trim() || '这个知识点还没有摘要。',
     };
 
+    if (useLocalOnly) {
+      patchGraphNote(selectedNote.id, patch);
+      setSelectedCategory(patch.category ?? selectedNote.category);
+      setExpandedCategories((current) => new Set(current).add(patch.category ?? selectedNote.category));
+      setIsPanelOpen(true);
+      setNotePanelMode('view');
+      setDetailsMessage('已保存到当前设备');
+      return;
+    }
+
     try {
       setDetailsMessage('正在保存...');
       const response = await fetch(`${API_BASE}/notes/${encodeURIComponent(selectedNote.id)}`, {
@@ -809,6 +912,8 @@ function App() {
       if (!response.ok || !data.note || !data.graph) throw new Error(data.error ?? '保存失败');
 
       setGraph(data.graph);
+      writeStoredGraph(data.graph);
+      setUseLocalOnly(false);
       setSelectedNoteId(data.note.id);
       setSelectedCategory(data.note.category);
       setExpandedCategories((current) => new Set(current).add(data.note!.category));
@@ -819,12 +924,19 @@ function App() {
       patchGraphNote(selectedNote.id, patch);
       setSelectedCategory(patch.category ?? selectedNote.category);
       setExpandedCategories((current) => new Set(current).add(patch.category ?? selectedNote.category));
-      setDetailsMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
+      setUseLocalOnly(true);
+      setDetailsMessage(error instanceof Error ? `${error.message}，已切换为本地保存` : '已切换为本地保存');
     }
   }
 
   async function saveNoteBody() {
     if (!selectedNote) return;
+
+    if (useLocalOnly) {
+      patchNoteLocally(selectedNote.id, { body: noteDraft });
+      setSaveMessage('已保存到当前设备');
+      return;
+    }
 
     try {
       setSaveMessage('正在保存...');
@@ -837,11 +949,14 @@ function App() {
       if (!response.ok || !data.note || !data.graph) throw new Error(data.error ?? '保存失败');
 
       setGraph(data.graph);
+      writeStoredGraph(data.graph);
+      setUseLocalOnly(false);
       setSelectedNoteId(data.note.id);
       setSaveMessage('已保存到后端');
     } catch (error) {
       patchNoteLocally(selectedNote.id, { body: noteDraft });
-      setSaveMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
+      setUseLocalOnly(true);
+      setSaveMessage(error instanceof Error ? `${error.message}，已切换为本地保存` : '已切换为本地保存');
     }
   }
 
@@ -852,6 +967,30 @@ function App() {
 
     const fallbackSelection = notes.find((note) => note.id !== selectedNote.id)?.id ?? '';
 
+    if (useLocalOnly) {
+      setGraph((current) => {
+        const remainingNotes = current.notes
+          .filter((note) => note.id !== selectedNote.id)
+          .map((note) => ({
+            ...note,
+            links: note.links.filter((link) => link !== selectedNote.id && link !== selectedNote.title),
+          }));
+        const nextGraph = graphWithTags({
+          ...current,
+          notes: remainingNotes,
+          edges: buildEdgesFromLinks(remainingNotes),
+        });
+        writeStoredGraph(nextGraph);
+        return nextGraph;
+      });
+      setSelectedNoteId(fallbackSelection);
+      setSelectedCategory('全部');
+      setIsPanelOpen(Boolean(fallbackSelection));
+      setNotePanelMode('view');
+      setApiMessage('已从当前设备删除');
+      return;
+    }
+
     try {
       const response = await fetch(`${API_BASE}/notes/${encodeURIComponent(selectedNote.id)}`, {
         method: 'DELETE',
@@ -860,29 +999,50 @@ function App() {
       if (!response.ok || !data.graph) throw new Error(data.error ?? '删除失败');
 
       setGraph(data.graph);
+      writeStoredGraph(data.graph);
+      setUseLocalOnly(false);
       setSelectedNoteId(data.graph.notes[0]?.id ?? '');
       setSelectedCategory('全部');
       setIsPanelOpen(Boolean(data.graph.notes[0]));
       setNotePanelMode('view');
       setApiMessage('已从后端删除');
     } catch (error) {
-      setGraph((current) => graphWithTags({
-        notes: current.notes.filter((note) => note.id !== selectedNote.id),
-        edges: current.edges.filter(([source, target]) => source !== selectedNote.id && target !== selectedNote.id),
-        tags: current.tags,
-        categories: current.categories,
-      }));
+      setGraph((current) => {
+        const remainingNotes = current.notes
+          .filter((note) => note.id !== selectedNote.id)
+          .map((note) => ({
+            ...note,
+            links: note.links.filter((link) => link !== selectedNote.id && link !== selectedNote.title),
+          }));
+        const nextGraph = graphWithTags({
+          ...current,
+          notes: remainingNotes,
+          edges: buildEdgesFromLinks(remainingNotes),
+        });
+        writeStoredGraph(nextGraph);
+        return nextGraph;
+      });
       setSelectedNoteId(fallbackSelection);
       setSelectedCategory('全部');
       setIsPanelOpen(Boolean(fallbackSelection));
       setNotePanelMode('view');
-      setApiMessage(error instanceof Error ? `${error.message}，已从当前页面移除` : '已从当前页面移除');
+      setUseLocalOnly(true);
+      setApiMessage(error instanceof Error ? `${error.message}，已切换为本地删除` : '已切换为本地删除');
     }
   }
 
   async function saveLinks(noteId: string, nextLinks: string[], message: string) {
-    setGraph((current) => graphWithTags(withSyncedEdges(current, noteId, nextLinks)));
+    setGraph((current) => {
+      const nextGraph = graphWithTags(withSyncedEdges(current, noteId, nextLinks));
+      writeStoredGraph(nextGraph);
+      return nextGraph;
+    });
     setLinkMessage(message);
+
+    if (useLocalOnly) {
+      setLinkMessage('连线已保存到当前设备');
+      return;
+    }
 
     try {
       const response = await fetch(`${API_BASE}/notes/${encodeURIComponent(noteId)}`, {
@@ -894,9 +1054,12 @@ function App() {
       if (!response.ok || !data.note || !data.graph) throw new Error(data.error ?? '连线保存失败');
 
       setGraph(data.graph);
+      writeStoredGraph(data.graph);
+      setUseLocalOnly(false);
       setLinkMessage('连线已保存到后端');
     } catch (error) {
-      setLinkMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
+      setUseLocalOnly(true);
+      setLinkMessage(error instanceof Error ? `${error.message}，已切换为本地保存` : '已切换为本地保存');
     }
   }
 
@@ -1082,13 +1245,22 @@ function App() {
       return;
     }
 
-    setGraph((current) => graphWithTags({
-      ...current,
-      categories: [...current.categories, category],
-    }));
+    setGraph((current) => {
+      const nextGraph = graphWithTags({
+        ...current,
+        categories: [...current.categories, category],
+      });
+      writeStoredGraph(nextGraph);
+      return nextGraph;
+    });
     setSelectedCategory(category);
     setExpandedCategories((current) => new Set(current).add(category));
     setNewCategoryName('');
+    if (useLocalOnly) {
+      setCategoryMessage('大类已创建');
+      return;
+    }
+
     setCategoryMessage('正在保存大类...');
 
     try {
@@ -1101,11 +1273,14 @@ function App() {
       if (!response.ok || !data.category || !data.graph) throw new Error(data.error ?? '大类保存失败');
 
       setGraph(data.graph);
+      writeStoredGraph(data.graph);
+      setUseLocalOnly(false);
       setSelectedCategory(data.category);
       setExpandedCategories((current) => new Set(current).add(data.category!));
       setCategoryMessage('大类已创建');
     } catch (error) {
-      setCategoryMessage(error instanceof Error ? `${error.message}，已暂存在当前页面` : '已暂存在当前页面');
+      setUseLocalOnly(true);
+      setCategoryMessage(error instanceof Error ? `${error.message}，已切换为本地保存` : '已切换为本地保存');
     }
   }
 

@@ -531,12 +531,25 @@ textarea:focus-visible {
   touch-action: none;
   cursor: grab;
   background:
-    radial-gradient(circle at 22% 20%, rgba(14, 165, 233, 0.2), transparent 28%),
-    radial-gradient(circle at 76% 28%, rgba(124, 58, 237, 0.22), transparent 32%),
-    radial-gradient(circle at 58% 78%, rgba(236, 72, 153, 0.12), transparent 32%),
-    radial-gradient(circle at 50% 52%, rgba(8, 47, 73, 0.22), transparent 44%),
-    linear-gradient(135deg, #02040a 0%, #050914 38%, #07111e 70%, #030712 100%);
-  box-shadow: inset 0 0 180px rgba(0, 0, 0, 0.8), inset 0 0 260px rgba(14, 165, 233, 0.08);
+    radial-gradient(circle at 18% 18%, rgba(8, 145, 178, 0.18), transparent 30%),
+    radial-gradient(circle at 76% 22%, rgba(88, 28, 135, 0.36), transparent 34%),
+    radial-gradient(circle at 54% 80%, rgba(30, 41, 59, 0.52), transparent 38%),
+    radial-gradient(circle at 50% 50%, rgba(14, 116, 144, 0.12), transparent 46%),
+    linear-gradient(135deg, #01030a 0%, #030615 36%, #070b1f 66%, #02030a 100%);
+  box-shadow: inset 0 0 220px rgba(0, 0, 0, 0.88), inset 0 0 320px rgba(15, 23, 42, 0.58);
+}
+
+.graph-area::before {
+  position: absolute;
+  inset: -12%;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse at 28% 42%, rgba(14, 165, 233, 0.1), transparent 34%),
+    radial-gradient(ellipse at 72% 50%, rgba(109, 40, 217, 0.18), transparent 38%),
+    radial-gradient(ellipse at 52% 62%, rgba(37, 99, 235, 0.12), transparent 36%);
+  filter: blur(14px);
+  opacity: 0.76;
+  content: "";
 }
 
 .graph-area.dragging {
@@ -552,20 +565,20 @@ textarea:focus-visible {
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(circle at 50% 48%, transparent 0%, rgba(0, 0, 0, 0.2) 58%, rgba(0, 0, 0, 0.64) 100%),
-    linear-gradient(180deg, rgba(125, 211, 252, 0.04), transparent 22%, transparent 78%, rgba(15, 23, 42, 0.48));
+    radial-gradient(circle at 50% 48%, transparent 0%, rgba(0, 0, 0, 0.28) 56%, rgba(0, 0, 0, 0.78) 100%),
+    linear-gradient(180deg, rgba(125, 211, 252, 0.025), transparent 24%, transparent 78%, rgba(0, 0, 0, 0.56));
   content: "";
 }
 
 .grid-bg {
   position: absolute;
   inset: 0;
-  opacity: 0.28;
+  opacity: 0.2;
   background-image:
-    linear-gradient(rgba(103, 232, 249, 0.11) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(99, 102, 241, 0.1) 1px, transparent 1px),
-    radial-gradient(circle, rgba(148, 163, 184, 0.28) 1px, transparent 1.8px);
-  background-size: 54px 54px, 54px 54px, 108px 108px;
+    linear-gradient(rgba(103, 232, 249, 0.08) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(99, 102, 241, 0.08) 1px, transparent 1px),
+    radial-gradient(circle, rgba(226, 232, 240, 0.36) 1px, transparent 1.8px);
+  background-size: 64px 64px, 64px 64px, 160px 160px;
   mask-image: linear-gradient(180deg, transparent 0%, black 18%, black 88%, transparent 100%);
 }
 
@@ -577,7 +590,7 @@ textarea:focus-visible {
 }
 
 .star-field-far {
-  opacity: 0.42;
+  opacity: 0.34;
   background-image:
     radial-gradient(circle, rgba(255, 255, 255, 0.96) 0 1px, transparent 1.7px),
     radial-gradient(circle, rgba(103, 232, 249, 0.72) 0 1px, transparent 1.9px),
@@ -588,7 +601,7 @@ textarea:focus-visible {
 }
 
 .star-field-near {
-  opacity: 0.76;
+  opacity: 0.56;
   background-image:
     radial-gradient(circle, rgba(255, 255, 255, 0.98) 0 1.3px, transparent 2.4px),
     radial-gradient(circle, rgba(34, 211, 238, 0.86) 0 1.4px, transparent 2.8px);
@@ -599,7 +612,7 @@ textarea:focus-visible {
 }
 
 .particle-stream {
-  opacity: 0.36;
+  opacity: 0.24;
   background:
     radial-gradient(circle at 12% 24%, rgba(34, 211, 238, 0.9) 0 2px, transparent 2.8px),
     radial-gradient(circle at 30% 76%, rgba(59, 130, 246, 0.72) 0 2px, transparent 3px),
@@ -660,28 +673,44 @@ textarea:focus-visible {
   line-height: 1.2;
   border: 1px solid rgba(255, 255, 255, 0.72);
   box-shadow:
-    0 0 0 5px rgba(255, 255, 255, 0.08),
-    0 0 34px rgba(34, 211, 238, 0.34),
-    0 16px 42px rgba(0, 0, 0, 0.5),
+    0 0 0 8px rgba(8, 47, 73, 0.32),
+    0 0 0 18px rgba(34, 211, 238, 0.07),
+    0 0 42px rgba(34, 211, 238, 0.34),
+    0 18px 48px rgba(0, 0, 0, 0.58),
     inset 0 1px 0 rgba(255, 255, 255, 0.5);
   transition: opacity 0.2s ease, filter 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
 }
 
+.node::before {
+  position: absolute;
+  left: 16%;
+  top: 13%;
+  width: 42%;
+  height: 34%;
+  border-radius: 999px;
+  background: radial-gradient(circle at 34% 30%, rgba(255, 255, 255, 0.86), rgba(255, 255, 255, 0.42) 36%, transparent 70%);
+  filter: blur(0.3px);
+  opacity: 0.88;
+  content: "";
+}
+
 .node::after {
   position: absolute;
-  inset: -8px;
+  inset: -10px;
   border-radius: inherit;
-  border: 1px solid rgba(103, 232, 249, 0.16);
-  opacity: 0.72;
+  border: 1px solid rgba(103, 232, 249, 0.22);
+  box-shadow: 0 0 24px rgba(34, 211, 238, 0.18);
+  opacity: 0.8;
   content: "";
 }
 
 .node:not(.selected):hover {
   transform: translate(-50%, -50%) scale(1.06);
   box-shadow:
-    0 0 0 8px rgba(103, 232, 249, 0.2),
-    0 0 42px rgba(34, 211, 238, 0.36),
-    0 22px 52px rgba(49, 68, 92, 0.24),
+    0 0 0 10px rgba(34, 211, 238, 0.18),
+    0 0 0 24px rgba(37, 99, 235, 0.08),
+    0 0 54px rgba(34, 211, 238, 0.44),
+    0 24px 58px rgba(0, 0, 0, 0.58),
     inset 0 1px 0 rgba(255, 255, 255, 0.42);
   filter: saturate(1.08);
 }
@@ -689,17 +718,17 @@ textarea:focus-visible {
 .node span {
   position: absolute;
   left: 50%;
-  bottom: calc(100% + 12px);
+  bottom: calc(100% + 16px);
   transform: translateX(-50%);
   width: max-content;
   max-width: 168px;
-  padding: 9px 14px;
-  border-radius: 7px;
-  color: rgba(226, 232, 240, 0.9);
-  background: rgba(2, 6, 23, 0.74);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.38), 0 0 24px rgba(34, 211, 238, 0.08);
-  backdrop-filter: blur(10px);
+  padding: 10px 16px;
+  border-radius: 8px;
+  color: rgba(226, 232, 240, 0.92);
+  background: linear-gradient(180deg, rgba(8, 13, 30, 0.78), rgba(3, 7, 18, 0.88));
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.44), 0 0 28px rgba(34, 211, 238, 0.1);
+  backdrop-filter: blur(12px);
   font-size: 14px;
   font-weight: 850;
   line-height: 1.2;
@@ -723,13 +752,15 @@ textarea:focus-visible {
   left: 50%;
   top: 100%;
   width: 1px;
-  height: 32px;
-  background: linear-gradient(180deg, rgba(148, 163, 184, 0.5), transparent);
+  height: 38px;
+  background: linear-gradient(180deg, rgba(148, 163, 184, 0.42), rgba(59, 130, 246, 0.18), transparent);
   content: "";
 }
 
 .node-core {
-  background: radial-gradient(circle at 30% 22%, #dbeafe, transparent 26%), linear-gradient(135deg, #4f46e5, #b2419d);
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.92), transparent 25%),
+    radial-gradient(circle at 50% 50%, rgba(168, 85, 247, 0.95), rgba(109, 40, 217, 0.98) 58%, rgba(67, 56, 202, 0.98) 100%);
 }
 
 .node-core span {
@@ -738,7 +769,9 @@ textarea:focus-visible {
 }
 
 .node-method {
-  background: radial-gradient(circle at 30% 22%, #dffcff, transparent 26%), linear-gradient(135deg, #0f77c9, #12a89c);
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.9), transparent 25%),
+    radial-gradient(circle at 50% 50%, rgba(34, 211, 238, 0.95), rgba(14, 165, 233, 0.98) 58%, rgba(13, 148, 136, 0.98) 100%);
 }
 
 .node-method span {
@@ -747,7 +780,9 @@ textarea:focus-visible {
 }
 
 .node-concept {
-  background: radial-gradient(circle at 30% 22%, #dcfce7, transparent 26%), linear-gradient(135deg, #168f63, #73b84d);
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.9), transparent 25%),
+    radial-gradient(circle at 50% 50%, rgba(74, 222, 128, 0.94), rgba(34, 197, 94, 0.98) 58%, rgba(21, 128, 61, 0.98) 100%);
 }
 
 .node-concept span {
@@ -757,7 +792,9 @@ textarea:focus-visible {
 
 .node-detail {
   color: #362507;
-  background: radial-gradient(circle at 30% 22%, #fff7d6, transparent 26%), linear-gradient(135deg, #f0b23d, #f6d55c);
+  background:
+    radial-gradient(circle at 30% 22%, rgba(255, 255, 255, 0.92), transparent 25%),
+    radial-gradient(circle at 50% 50%, rgba(250, 204, 21, 0.98), rgba(234, 179, 8, 0.98) 58%, rgba(180, 83, 9, 0.98) 100%);
 }
 
 .node-detail span {
@@ -768,10 +805,10 @@ textarea:focus-visible {
 .node.selected {
   transform: translate(-50%, -50%) scale(1.12);
   box-shadow:
-    0 0 0 10px rgba(37, 99, 235, 0.18),
-    0 0 0 22px rgba(34, 211, 238, 0.13),
-    0 0 58px rgba(34, 211, 238, 0.36),
-    0 24px 70px rgba(37, 99, 235, 0.24);
+    0 0 0 12px rgba(14, 165, 233, 0.22),
+    0 0 0 30px rgba(37, 99, 235, 0.12),
+    0 0 72px rgba(34, 211, 238, 0.48),
+    0 24px 80px rgba(0, 0, 0, 0.5);
   z-index: 10;
 }
 
