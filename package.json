@@ -9,15 +9,21 @@
     "dev:tablet": "vite --host 0.0.0.0",
     "dev:api": "node server/index.js",
     "build": "tsc && vite build",
+    "android:sync": "npx cap sync android",
+    "android:open": "npx cap open android",
+    "android:copy": "npx cap copy android",
+    "android:build:debug": "cd android && gradlew.bat assembleDebug",
     "preview": "vite preview",
     "preview:tablet": "vite preview --host 0.0.0.0"
   },
   "dependencies": {
+    "@capacitor/android": "^7.6.4",
+    "@capacitor/cli": "^7.6.4",
+    "@capacitor/core": "^7.6.4",
     "@vitejs/plugin-react": "latest",
-    "vite": "latest",
-    "typescript": "latest",
     "react": "latest",
-    "react-dom": "latest"
-  },
-  "devDependencies": {}
+    "react-dom": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  }
 }

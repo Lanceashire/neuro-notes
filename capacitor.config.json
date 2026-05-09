@@ -1,0 +1,6 @@
+{
+  "appId": "com.neuronotes.app",
+  "appName": "NeuroNotes",
+  "webDir": "dist",
+  "bundledWebRuntime": false
+}
